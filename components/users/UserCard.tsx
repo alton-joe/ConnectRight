@@ -81,12 +81,15 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
 
   const handleConnect = async () => {
     setSending(true)
-    const { error } = await supabase.from('connection_requests').insert({
-      sender_id: currentUserId,
-      receiver_id: profile.id,
-    })
-    if (!error) setRequestStatus('pending')
-    setSending(false)
+    try {
+      const { error } = await supabase.from('connection_requests').insert({
+        sender_id: currentUserId,
+        receiver_id: profile.id,
+      })
+      if (!error) setRequestStatus('pending')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (

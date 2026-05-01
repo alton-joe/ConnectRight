@@ -38,36 +38,38 @@ export function useConnections(currentUserId: string | undefined): UseConnection
     }
     if (!silent) setLoading(true)
 
-    const { data } = await supabase
-      .from('connections')
-      .select(`
-        id,
-        user_a,
-        user_b,
-        created_at,
-        profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, last_active, created_at),
-        profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, last_active, created_at)
-      `)
-      .or(`user_a.eq.${currentUserId},user_b.eq.${currentUserId}`)
+    try {
+      const { data } = await supabase
+        .from('connections')
+        .select(`
+          id,
+          user_a,
+          user_b,
+          created_at,
+          profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, last_active, created_at),
+          profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, last_active, created_at)
+        `)
+        .or(`user_a.eq.${currentUserId},user_b.eq.${currentUserId}`)
 
-    if (!mountedRef.current) return
+      if (!mountedRef.current) return
 
-    if (data) {
-      const mapped: Connection[] = (data as unknown as RawConnection[]).map((row) => ({
-        id: row.id,
-        user_a: row.user_a,
-        user_b: row.user_b,
-        created_at: row.created_at,
-        other_user:
-          row.user_a === currentUserId
-            ? (row.profile_b ?? undefined)
-            : (row.profile_a ?? undefined),
-      }))
-      setConnections(mapped)
+      if (data) {
+        const mapped: Connection[] = (data as unknown as RawConnection[]).map((row) => ({
+          id: row.id,
+          user_a: row.user_a,
+          user_b: row.user_b,
+          created_at: row.created_at,
+          other_user:
+            row.user_a === currentUserId
+              ? (row.profile_b ?? undefined)
+              : (row.profile_a ?? undefined),
+        }))
+        setConnections(mapped)
+      }
+    } finally {
+      // Always clear loading — runs even if the fetch throws or returns early
+      setLoading(false)
     }
-
-    // Always clear loading — even silent fetches must unblock a stuck initial load
-    setLoading(false)
   }, [currentUserId, supabase])
 
   useEffect(() => {
