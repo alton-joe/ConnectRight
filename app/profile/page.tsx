@@ -1,21 +1,20 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import LandingPage from '@/components/auth/LandingPage'
+import ProfileClient from './ProfileClient'
 
-export default async function RootPage() {
+export default async function ProfilePage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Guest — show the public landing page
-  if (!user) return <LandingPage />
+  if (!user) redirect('/')
 
-  // Authenticated — route based on profile status
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id')
+    .select('*')
     .eq('id', user.id)
     .single()
 
   if (!profile) redirect('/setup')
-  redirect('/home')
+
+  return <ProfileClient profile={profile} />
 }
