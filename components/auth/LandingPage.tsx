@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import SiteFooter from '@/components/layout/SiteFooter'
 
 // Static placeholder cards — no real user data exposed
 const PLACEHOLDER_CARDS = [
@@ -100,7 +99,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <SiteFooter />
     </div>
   )
 }
