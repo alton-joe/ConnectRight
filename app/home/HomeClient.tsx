@@ -7,6 +7,7 @@ import WelcomePopup from '@/components/auth/WelcomePopup'
 import ConnectedCard from './ConnectedCard'
 import ChatWindow from '@/components/chat/ChatWindow'
 import { useConnections } from '@/hooks/useConnections'
+import { useAvailableUsers } from '@/hooks/useAvailableUsers'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { createClient } from '@/lib/supabase/client'
 import UserAvatar from '@/components/ui/UserAvatar'
@@ -28,9 +29,9 @@ export default function HomeClient({
   initialChatId,
 }: HomeClientProps) {
   const router = useRouter()
-  const { connections, loading: connectionsLoading } = useConnections(currentUserId)
+  const { connections } = useConnections(currentUserId)
+  const { users: allOtherProfiles } = useAvailableUsers(currentUserId, initialProfiles)
   const { setActiveChatConnectionId } = useActiveChat()
-  // chatPanelOpen drives the CSS animation (grid column size + opacity/transform)
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [fullscreenChat, setFullscreenChat] = useState(false)
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
@@ -192,8 +193,8 @@ export default function HomeClient({
   )
 
   const availableProfiles = useMemo(
-    () => initialProfiles.filter((p) => !connectedIds.has(p.id)),
-    [initialProfiles, connectedIds]
+    () => allOtherProfiles.filter((p) => !connectedIds.has(p.id)),
+    [allOtherProfiles, connectedIds]
   )
 
   const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
@@ -244,11 +245,7 @@ export default function HomeClient({
           {/* MIDDLE (or RIGHT when no chat) — Connected list */}
           <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 overflow-hidden">
             <h2 className="text-white font-semibold text-base shrink-0">Connected</h2>
-            {connectionsLoading ? (
-              <div className="flex-1 flex items-center justify-center">
-                <p className="text-white/30 text-sm">Loading...</p>
-              </div>
-            ) : connections.length === 0 ? (
+            {connections.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
                   <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>

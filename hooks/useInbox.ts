@@ -2,37 +2,27 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import type { Connection, Profile } from '@/types'
+import type { ConnectionRequest } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-interface RawConnection {
-  id: string
-  user_a: string
-  user_b: string
-  created_at: string
-  profile_a: Profile | null
-  profile_b: Profile | null
-}
-
-interface UseConnectionsReturn {
-  connections: Connection[]
+interface UseInboxReturn {
+  requests: ConnectionRequest[]
   loading: boolean
   refetch: () => void
 }
 
-export function useConnections(currentUserId: string | undefined): UseConnectionsReturn {
-  const [connections, setConnections] = useState<Connection[]>([])
+export function useInbox(currentUserId: string): UseInboxReturn {
+  const [requests, setRequests] = useState<ConnectionRequest[]>([])
   const [loading, setLoading] = useState(false)
   const supabase = useMemo(() => createClient(), [])
-  const channelRef = useRef<RealtimeChannel | null>(null)
   const mountedRef = useRef(true)
+  const channelRef = useRef<RealtimeChannel | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Unique per hook instance so two useInbox callers on the same singleton Supabase
+  // client (e.g. GlobalHeader + InboxPanel) don't collide on the same channel name.
+  const instanceId = useMemo(() => Math.random().toString(36).slice(2, 9), [])
 
-  // silent=true skips the loading spinner — used for background refreshes so existing
-  // data stays visible while the update happens in the background.
-  // The 10s timeout prevents the loading spinner from hanging forever when the
-  // network is down or the Supabase session has expired after an idle period.
   const fetch = useCallback(async (silent = false) => {
     if (!currentUserId) {
       setLoading(false)
@@ -43,40 +33,27 @@ export function useConnections(currentUserId: string | undefined): UseConnection
     try {
       const { data } = await Promise.race([
         supabase
-          .from('connections')
+          .from('connection_requests')
           .select(`
-            id,
-            user_a,
-            user_b,
-            created_at,
-            profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, last_active, created_at),
-            profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, last_active, created_at)
+            *,
+            sender:profiles!connection_requests_sender_id_fkey(
+              id, username, email, avatar_url, last_active, created_at
+            )
           `)
-          .or(`user_a.eq.${currentUserId},user_b.eq.${currentUserId}`),
+          .eq('receiver_id', currentUserId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false }),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('timeout')), 10_000)
         ),
       ])
 
       if (!mountedRef.current) return
-
-      if (data) {
-        const mapped: Connection[] = (data as unknown as RawConnection[]).map((row) => ({
-          id: row.id,
-          user_a: row.user_a,
-          user_b: row.user_b,
-          created_at: row.created_at,
-          other_user:
-            row.user_a === currentUserId
-              ? (row.profile_b ?? undefined)
-              : (row.profile_a ?? undefined),
-        }))
-        setConnections(mapped)
-      }
+      setRequests((data as ConnectionRequest[]) ?? [])
     } catch {
-      // Timeout or network error — loading clears in finally
+      // Timeout or network error — keep existing state
     } finally {
-      setLoading(false)
+      if (mountedRef.current) setLoading(false)
     }
   }, [currentUserId, supabase])
 
@@ -103,34 +80,21 @@ export function useConnections(currentUserId: string | undefined): UseConnection
       }
 
       const ch = supabase
-        .channel(`connections-${currentUserId}`)
+        .channel(`inbox-${currentUserId}-${instanceId}`)
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'connections' },
-          (payload) => {
-            const row = payload.new as { user_a: string; user_b: string }
-            if (row.user_a === currentUserId || row.user_b === currentUserId) {
-              fetch(true)
-            }
-          }
+          { event: 'INSERT', schema: 'public', table: 'connection_requests', filter: `receiver_id=eq.${currentUserId}` },
+          () => fetch(true)
         )
         .on(
           'postgres_changes',
-          { event: 'UPDATE', schema: 'public', table: 'connections' },
-          (payload) => {
-            const row = payload.new as { user_a: string; user_b: string }
-            if (row.user_a === currentUserId || row.user_b === currentUserId) {
-              fetch(true)
-            }
-          }
+          { event: 'UPDATE', schema: 'public', table: 'connection_requests', filter: `receiver_id=eq.${currentUserId}` },
+          () => fetch(true)
         )
         .on(
           'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'connections' },
-          () => {
-            // payload.old only contains `id` without REPLICA IDENTITY FULL — refetch unconditionally
-            fetch(true)
-          }
+          { event: 'DELETE', schema: 'public', table: 'connection_requests', filter: `receiver_id=eq.${currentUserId}` },
+          () => fetch(true)
         )
         .subscribe((status) => {
           if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && mountedRef.current) {
@@ -174,5 +138,5 @@ export function useConnections(currentUserId: string | undefined): UseConnection
     }
   }, [currentUserId, supabase, fetch])
 
-  return { connections, loading, refetch: fetch }
+  return { requests, loading, refetch: fetch }
 }

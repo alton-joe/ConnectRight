@@ -32,6 +32,7 @@ export interface Message {
   sender_id: string
   content: string
   created_at: string
+  sender?: { username: string }
 }
 
 export interface ChatNotification {

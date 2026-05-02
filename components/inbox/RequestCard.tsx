@@ -19,30 +19,48 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
   const handleAccept = async () => {
     setLoading('accept')
     setError('')
-    const { error: rpcError } = await supabase.rpc('accept_connection_request', {
-      request_id: request.id,
-    })
-    if (rpcError) {
+    try {
+      const { error: rpcError } = await Promise.race([
+        supabase.rpc('accept_connection_request', { request_id: request.id }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10_000)
+        ),
+      ])
+      if (rpcError) {
+        setError('Failed to accept. Try again.')
+        return
+      }
+      onRemove(request.id)
+    } catch {
       setError('Failed to accept. Try again.')
+    } finally {
       setLoading(null)
-      return
     }
-    onRemove(request.id)
   }
 
   const handleDecline = async () => {
     setLoading('decline')
     setError('')
-    const { error: updateError } = await supabase
-      .from('connection_requests')
-      .update({ status: 'declined' })
-      .eq('id', request.id)
-    if (updateError) {
+    try {
+      const { error: updateError } = await Promise.race([
+        supabase
+          .from('connection_requests')
+          .update({ status: 'declined' })
+          .eq('id', request.id),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10_000)
+        ),
+      ])
+      if (updateError) {
+        setError('Failed to decline. Try again.')
+        return
+      }
+      onRemove(request.id)
+    } catch {
       setError('Failed to decline. Try again.')
+    } finally {
       setLoading(null)
-      return
     }
-    onRemove(request.id)
   }
 
   const senderName = request.sender?.username ?? 'Unknown'

@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import UserAvatar from '@/components/ui/UserAvatar'
 import ViewProfileModal from './ViewProfileModal'
+import { useRelationshipStatus } from '@/hooks/useRelationshipStatus'
 import type { Profile } from '@/types'
 
 interface UserCardProps {
@@ -14,91 +15,83 @@ interface UserCardProps {
   compact?: boolean
 }
 
-type RequestStatus = 'none' | 'pending' | 'accepted'
-
 export default function UserCard({ profile, currentUserId, compact = false }: UserCardProps) {
   const [modalOpen, setModalOpen] = useState(false)
-  const [requestStatus, setRequestStatus] = useState<RequestStatus>('none')
-  const [sending, setSending] = useState(false)
+  const [optimisticRequested, setOptimisticRequested] = useState(false)
   const supabase = useMemo(() => createClient(), [])
 
-  useEffect(() => {
-    const checkStatus = async () => {
+  const { status, loading: statusLoading } = useRelationshipStatus(currentUserId, profile.id)
 
-      // Check existing connection
-      const { data: conn } = await supabase
-        .from('connections')
-        .select('id')
-        .or(
-          `and(user_a.eq.${currentUserId},user_b.eq.${profile.id}),and(user_a.eq.${profile.id},user_b.eq.${currentUserId})`
-        )
-        .single()
-
-      if (conn) {
-        setRequestStatus('accepted')
-        return
-      }
-
-      // Check existing request
-      const { data: req } = await supabase
-        .from('connection_requests')
-        .select('status')
-        .eq('sender_id', currentUserId)
-        .eq('receiver_id', profile.id)
-        .single()
-
-      if (req?.status === 'pending') setRequestStatus('pending')
-    }
-
-    checkStatus()
-  }, [currentUserId, profile.id, supabase])
-
-  // Live updates: when the other user accepts or declines our request, reflect it instantly
-  useEffect(() => {
-    if (requestStatus !== 'pending') return
-
-    const ch = supabase
-      .channel(`request-status-${currentUserId}-${profile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'connection_requests',
-          filter: `sender_id=eq.${currentUserId}`,
-        },
-        (payload) => {
-          const row = payload.new as { sender_id: string; receiver_id: string; status: string }
-          if (row.sender_id !== currentUserId || row.receiver_id !== profile.id) return
-          if (row.status === 'declined') setRequestStatus('none')
-          if (row.status === 'accepted') setRequestStatus('accepted')
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(ch) }
-  }, [requestStatus, currentUserId, profile.id, supabase])
+  // While the hook is still on its initial fetch, apply any optimistic override.
+  // Once the hook returns a real status, the optimistic flag is shadowed.
+  const displayStatus = optimisticRequested && status === 'none' ? 'requested' : status
 
   const handleConnect = async () => {
-    setSending(true)
-    try {
-      const { error } = await supabase.from('connection_requests').insert({
-        sender_id: currentUserId,
-        receiver_id: profile.id,
-      })
-      if (!error) setRequestStatus('pending')
-    } finally {
-      setSending(false)
+    setOptimisticRequested(true)
+    const { error } = await supabase
+      .from('connection_requests')
+      .insert({ sender_id: currentUserId, receiver_id: profile.id })
+
+    if (error) {
+      if (error.code === '23505') {
+        // Unique-violation — request already exists, keep optimistic state
+        return
+      }
+      // Any other error: confirm via a quick read before reverting
+      const { data: existing } = await supabase
+        .from('connection_requests')
+        .select('id')
+        .eq('sender_id', currentUserId)
+        .eq('receiver_id', profile.id)
+        .eq('status', 'pending')
+        .limit(1)
+      if (!existing || existing.length === 0) setOptimisticRequested(false)
     }
+    // On success the hook's INSERT subscription fires, sets status → 'requested',
+    // which shadows the optimistic flag automatically.
+  }
+
+  const buttonContent = () => {
+    if (statusLoading && displayStatus === 'none' && !optimisticRequested) {
+      return (
+        <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>
+          …
+        </Button>
+      )
+    }
+    if (displayStatus === 'connected') {
+      return (
+        <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>
+          Connected
+        </Button>
+      )
+    }
+    if (displayStatus === 'requested') {
+      return (
+        <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>
+          Requested
+        </Button>
+      )
+    }
+    if (displayStatus === 'pending') {
+      return (
+        <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>
+          Pending
+        </Button>
+      )
+    }
+    return (
+      <Button variant="primary" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} onClick={handleConnect}>
+        Connect
+      </Button>
+    )
   }
 
   return (
     <>
       <Card className="flex items-center gap-3">
-        {/* Avatar */}
         <UserAvatar username={profile.username} avatarUrl={profile.avatar_url} size={40} />
 
-        {/* Username + actions — stacked when compact (chat open), inline otherwise */}
         <div className={`flex-1 min-w-0 ${compact ? 'flex flex-col gap-1' : 'flex items-center gap-2'}`}>
           <p className="text-white font-medium truncate flex-1 min-w-0" title={profile.username}>
             {profile.username}
@@ -116,15 +109,7 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
               </svg>
             </button>
 
-            {requestStatus === 'accepted' ? (
-              <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>Connected</Button>
-            ) : requestStatus === 'pending' ? (
-              <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>Requested</Button>
-            ) : (
-              <Button variant="primary" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} onClick={handleConnect} disabled={sending}>
-                {sending ? '...' : 'Connect'}
-              </Button>
-            )}
+            {buttonContent()}
           </div>
         </div>
       </Card>

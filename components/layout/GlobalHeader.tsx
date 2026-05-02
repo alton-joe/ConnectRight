@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useActiveChat } from '@/context/ActiveChatContext'
+import { useInbox } from '@/hooks/useInbox'
 import InboxPanel from '@/components/inbox/InboxPanel'
 import { formatTime } from '@/utils/helpers'
 import type { Message, ChatNotification } from '@/types'
@@ -68,8 +69,10 @@ export default function GlobalHeader() {
   const { user, loading: authLoading } = useAuth()
   const { activeChatConnectionId } = useActiveChat()
   const [inboxOpen, setInboxOpen] = useState(false)
-  const [pendingCount, setPendingCount] = useState(0)
   const [signingIn, setSigningIn] = useState(false)
+
+  const { requests: pendingRequests } = useInbox(user?.id ?? '')
+  const pendingCount = pendingRequests.length
 
   // Chat notification state
   const [chatNotifications, setChatNotifications] = useState<ChatNotification[]>([])
@@ -84,70 +87,22 @@ export default function GlobalHeader() {
 
   const supabase = useMemo(() => createClient(), [])
 
-  // Fetch pending connection request count
-  useEffect(() => {
+  const fetchConnectionsMap = useCallback(async () => {
     if (!user || pathname === '/') return
-    const fetchCount = async () => {
-      const { count } = await supabase
-        .from('connection_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('receiver_id', user.id)
-        .eq('status', 'pending')
-      setPendingCount(count ?? 0)
-    }
-    fetchCount()
-  }, [user, pathname, supabase])
-
-  // Keep pending count live: increment when a new request arrives, decrement when one
-  // is actioned (accepted → connection row appears; declined → status changes).
-  useEffect(() => {
-    if (!user || pathname === '/') return
-
-    const ch = supabase
-      .channel('header-pending-count')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'connection_requests',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        () => setPendingCount((n) => n + 1)
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'connection_requests',
-          filter: `receiver_id=eq.${user.id}`,
-        },
-        (payload) => {
-          const row = payload.new as { status: string }
-          if (row.status !== 'pending') setPendingCount((n) => Math.max(0, n - 1))
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(ch) }
-  }, [user, pathname, supabase])
-
-  // Fetch connections to build connectionId → other-user map, and refresh whenever
-  // a new connection row is inserted (i.e. a request was accepted).
-  useEffect(() => {
-    if (!user || pathname === '/') return
-
-    const fetchConnections = async () => {
-      const { data } = await supabase
-        .from('connections')
-        .select(`
-          id, user_a, user_b,
-          profile_a:profiles!connections_user_a_fkey(username, avatar_url),
-          profile_b:profiles!connections_user_b_fkey(username, avatar_url)
-        `)
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-
+    try {
+      const { data } = await Promise.race([
+        supabase
+          .from('connections')
+          .select(`
+            id, user_a, user_b,
+            profile_a:profiles!connections_user_a_fkey(username, avatar_url),
+            profile_b:profiles!connections_user_b_fkey(username, avatar_url)
+          `)
+          .or(`user_a.eq.${user.id},user_b.eq.${user.id}`),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('timeout')), 10_000)
+        ),
+      ])
       if (data) {
         const map = new Map<string, { username: string; avatarUrl: string | null }>()
         ;(data as any[]).forEach((row) => {
@@ -157,27 +112,44 @@ export default function GlobalHeader() {
         })
         setConnectionsMap(map)
       }
+    } catch {
+      // Timeout or network error — keep current map
     }
+  }, [user, pathname, supabase])
 
-    fetchConnections()
+  // Fetch connections to build connectionId → other-user map, and refresh whenever
+  // a new connection row is inserted (i.e. a request was accepted).
+  useEffect(() => {
+    if (!user || pathname === '/') return
+
+    fetchConnectionsMap()
 
     // Refresh the map whenever the current user gains a new connection
     const ch = supabase
-      .channel('header-connections-map')
+      .channel(`header-connections-map-${user.id}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'connections' },
         (payload) => {
           const row = payload.new as { user_a: string; user_b: string }
           if (row.user_a === user.id || row.user_b === user.id) {
-            fetchConnections()
+            fetchConnectionsMap()
           }
         }
       )
       .subscribe()
 
     return () => { supabase.removeChannel(ch) }
-  }, [user, pathname, supabase])
+  }, [user, pathname, supabase, fetchConnectionsMap])
+
+  // Refresh connections map when tab becomes visible after idle
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') fetchConnectionsMap()
+    }
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [fetchConnectionsMap])
 
   // Keep activeChatRef in sync so the subscription callback always reads the latest value
   useEffect(() => {
@@ -204,7 +176,7 @@ export default function GlobalHeader() {
       }
 
       const channel = supabase
-        .channel('header-chat-notifications')
+        .channel(`header-chat-notifications-${user.id}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -424,7 +396,7 @@ export default function GlobalHeader() {
       {user && (
         <InboxPanel
           isOpen={inboxOpen}
-          onClose={() => { setInboxOpen(false); setPendingCount(0) }}
+          onClose={() => setInboxOpen(false)}
           currentUserId={user.id}
         />
       )}

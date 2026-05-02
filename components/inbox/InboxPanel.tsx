@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
+import { useInbox } from '@/hooks/useInbox'
 import RequestCard from './RequestCard'
-import type { ConnectionRequest } from '@/types'
 
 interface InboxPanelProps {
   isOpen: boolean
@@ -12,53 +11,22 @@ interface InboxPanelProps {
 }
 
 export default function InboxPanel({ isOpen, onClose, currentUserId }: InboxPanelProps) {
-  const [requests, setRequests] = useState<ConnectionRequest[]>([])
-  const [loading, setLoading] = useState(false)
-  const supabase = useMemo(() => createClient(), [])
+  const { requests: hookRequests, refetch } = useInbox(currentUserId)
 
-  const fetchRequests = useCallback(async () => {
-    if (!currentUserId) return
-    setLoading(true)
-    const { data } = await supabase
-      .from('connection_requests')
-      .select(
-        `*, sender:profiles!connection_requests_sender_id_fkey(id, username, email, avatar_url, last_active, created_at)`
-      )
-      .eq('receiver_id', currentUserId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
+  // Optimistic removal overlay: IDs removed locally before the hook re-fetches.
+  // Once the hook re-fetches (triggered by the UPDATE/DELETE realtime event),
+  // the actioned request is gone from hookRequests too, so removedIds becomes stale
+  // but harmless. InboxPanel unmounts on close, resetting this to empty automatically.
+  const [removedIds, setRemovedIds] = useState<Set<string>>(new Set())
+  const visibleRequests = hookRequests.filter((r) => !removedIds.has(r.id))
 
-    setRequests((data as ConnectionRequest[]) ?? [])
-    setLoading(false)
-  }, [currentUserId, supabase])
-
+  // Ensure data is fresh the moment the panel opens
   useEffect(() => {
-    if (isOpen) fetchRequests()
-  }, [isOpen, fetchRequests])
-
-  // While the panel is open, listen for new incoming requests in real-time
-  useEffect(() => {
-    if (!isOpen || !currentUserId) return
-
-    const ch = supabase
-      .channel('inbox-live-requests')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'connection_requests',
-          filter: `receiver_id=eq.${currentUserId}`,
-        },
-        () => fetchRequests()
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(ch) }
-  }, [isOpen, currentUserId, supabase, fetchRequests])
+    if (isOpen) refetch()
+  }, [isOpen, refetch])
 
   const handleRemove = (id: string) => {
-    setRequests((prev) => prev.filter((r) => r.id !== id))
+    setRemovedIds((prev) => new Set([...prev, id]))
   }
 
   return (
@@ -94,11 +62,9 @@ export default function InboxPanel({ isOpen, onClose, currentUserId }: InboxPane
           </button>
         </div>
 
-        {/* Content */}
+        {/* Content — always renders immediately, no loading spinner */}
         <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
-          {loading ? (
-            <p className="text-white/40 text-sm text-center mt-8">Loading...</p>
-          ) : requests.length === 0 ? (
+          {visibleRequests.length === 0 ? (
             <div className="flex flex-col items-center gap-2 mt-12 text-center">
               <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
                 <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -107,7 +73,7 @@ export default function InboxPanel({ isOpen, onClose, currentUserId }: InboxPane
               <p className="text-white/40 text-sm">No pending requests</p>
             </div>
           ) : (
-            requests.map((req) => (
+            visibleRequests.map((req) => (
               <RequestCard key={req.id} request={req} onRemove={handleRemove} />
             ))
           )}
