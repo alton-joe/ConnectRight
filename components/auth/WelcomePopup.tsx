@@ -41,7 +41,21 @@ export default function WelcomePopup() {
 
   return (
     <Modal isOpen={isOpen} onClose={dismiss}>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-6 relative">
+        {slide > 0 && (
+          <button
+            type="button"
+            onClick={() => setSlide(slide - 1)}
+            aria-label="Previous"
+            className="absolute -top-1 -left-1 text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M19 12H5" />
+              <path d="m12 19-7-7 7-7" />
+            </svg>
+          </button>
+        )}
+
         {/* Slide indicators */}
         <div className="flex gap-1.5 justify-center">
           {slides.map((_, i) => (
@@ -60,9 +74,6 @@ export default function WelcomePopup() {
         </div>
 
         <div className="flex gap-3">
-          <Button variant="ghost" size="md" className="flex-1" onClick={dismiss}>
-            Skip
-          </Button>
           <Button variant="primary" size="md" className="flex-1" onClick={handleNext}>
             {slide < slides.length - 1 ? 'Next' : "Let's go"}
           </Button>
