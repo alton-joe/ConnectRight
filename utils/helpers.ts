@@ -14,6 +14,25 @@ export function timeAgo(isoString: string): string {
   return formatDate(isoString)
 }
 
+// Compact duration: "now", "2m", "1h", "5d", "3w". For ages older than ~4 weeks
+// it falls back to a short date.
+export function shortTimeAgo(isoString: string): string {
+  const diffMs = Date.now() - new Date(isoString).getTime()
+  if (diffMs < 0) return 'now'
+  const diffSecs = Math.floor(diffMs / 1000)
+  if (diffSecs < 45) return 'now'
+  const diffMins = Math.floor(diffSecs / 60)
+  if (diffMins < 60) return `${diffMins}m`
+  const diffHours = Math.floor(diffMins / 60)
+  if (diffHours < 24) return `${diffHours}h`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays}d`
+  const diffWeeks = Math.floor(diffDays / 7)
+  if (diffWeeks < 5) return `${diffWeeks}w`
+  const date = new Date(isoString)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export function formatTime(isoString: string): string {
   const date = new Date(isoString)
   return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })

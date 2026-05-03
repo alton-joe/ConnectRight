@@ -21,6 +21,9 @@ export function useRelationshipStatus(
   const mountedRef = useRef(true)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Discard stale fetch responses so a slow visibility-change refetch can't
+  // overwrite a fresher realtime-triggered refetch.
+  const fetchSeqRef = useRef(0)
   const instanceId = useMemo(() => Math.random().toString(36).slice(2, 9), [])
 
   const fetch = useCallback(async (silent = false) => {
@@ -28,6 +31,7 @@ export function useRelationshipStatus(
       setLoading(false)
       return
     }
+    const seq = ++fetchSeqRef.current
     if (!silent) setLoading(true)
 
     try {
@@ -60,7 +64,7 @@ export function useRelationshipStatus(
         ),
       ])
 
-      if (!mountedRef.current) return
+      if (seq !== fetchSeqRef.current || !mountedRef.current) return
 
       if (connResult.data && connResult.data.length > 0) {
         setStatus('connected')
@@ -74,7 +78,7 @@ export function useRelationshipStatus(
     } catch {
       // Timeout or network error — keep existing status
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (seq === fetchSeqRef.current && mountedRef.current) setLoading(false)
     }
   }, [currentUserId, targetUserId, supabase])
 

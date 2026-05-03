@@ -21,12 +21,17 @@ export function useAvailableUsers(
   const channelRef = useRef<RealtimeChannel | null>(null)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  // Discard stale fetch responses so a slow poll can't overwrite a fresher
+  // visibility-change refetch.
+  const fetchSeqRef = useRef(0)
+  const instanceId = useMemo(() => Math.random().toString(36).slice(2, 9), [])
 
   const fetch = useCallback(async (silent = false) => {
     if (!currentUserId) {
       setLoading(false)
       return
     }
+    const seq = ++fetchSeqRef.current
     if (!silent) setLoading(true)
 
     try {
@@ -41,12 +46,12 @@ export function useAvailableUsers(
         ),
       ])
 
-      if (!mountedRef.current) return
+      if (seq !== fetchSeqRef.current || !mountedRef.current) return
       setUsers((data as Profile[]) ?? [])
     } catch {
       // Timeout or network error — keep existing state
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (seq === fetchSeqRef.current && mountedRef.current) setLoading(false)
     }
   }, [currentUserId, supabase])
 
@@ -73,7 +78,7 @@ export function useAvailableUsers(
       }
 
       const ch = supabase
-        .channel(`available-users-${currentUserId}`)
+        .channel(`available-users-${currentUserId}-${instanceId}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'profiles' },
@@ -129,7 +134,7 @@ export function useAvailableUsers(
         channelRef.current = null
       }
     }
-  }, [currentUserId, supabase, fetch])
+  }, [currentUserId, supabase, fetch, instanceId])
 
   return { users, loading }
 }

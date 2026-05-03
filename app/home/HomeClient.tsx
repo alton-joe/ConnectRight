@@ -1,19 +1,26 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import UserCard from '@/components/users/UserCard'
 import WelcomePopup from '@/components/auth/WelcomePopup'
 import ConnectedCard from './ConnectedCard'
 import ChatWindow from '@/components/chat/ChatWindow'
-import { useConnections } from '@/hooks/useConnections'
+import { useRealtime } from '@/providers/RealtimeProvider'
 import { useAvailableUsers } from '@/hooks/useAvailableUsers'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { createClient } from '@/lib/supabase/client'
 import UserAvatar from '@/components/ui/UserAvatar'
 import { useActiveChat } from '@/context/ActiveChatContext'
+import { useTypingForConnections } from '@/hooks/useTypingForConnections'
 import type { Profile, Message } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+
+interface LastMessageInfo {
+  created_at: string
+  sender_id: string
+  read_at: string | null
+}
 
 interface HomeClientProps {
   currentUserId: string
@@ -29,20 +36,24 @@ export default function HomeClient({
   initialChatId,
 }: HomeClientProps) {
   const router = useRouter()
-  const { connections } = useConnections(currentUserId)
+  const { connections } = useRealtime()
   const { users: allOtherProfiles } = useAvailableUsers(currentUserId, initialProfiles)
   const { setActiveChatConnectionId } = useActiveChat()
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [fullscreenChat, setFullscreenChat] = useState(false)
+  const [connectedFilter, setConnectedFilter] = useState<'all' | 'unread'>('all')
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
-  const [lastMessageAt, setLastMessageAt] = useState<Record<string, string>>({})
+  const [lastMessageInfo, setLastMessageInfo] = useState<Record<string, LastMessageInfo>>({})
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restoredFromUrl = useRef(false)
 
   const supabase = useMemo(() => createClient(), [])
   const homeChannelRef = useRef<RealtimeChannel | null>(null)
   const homeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Discard stale fetch responses (e.g. a poll that started before a visibility-
+  // change refetch) so the slower response can't overwrite the newer one.
+  const fetchSeqRef = useRef(0)
 
   const openChat = (id: string) => {
     if (closeTimerRef.current) {
@@ -87,6 +98,7 @@ export default function HomeClient({
 
   const fetchLatestMessages = useCallback(async () => {
     if (connections.length === 0) return
+    const seq = ++fetchSeqRef.current
     const connectionIds = connections.map((c) => c.id)
     // Limit rows fetched: ordered DESC so first hit per connection_id is the latest.
     // Cap at connections*10 (min 50) so we reliably cover every connection without
@@ -94,17 +106,26 @@ export default function HomeClient({
     const rowLimit = Math.max(connections.length * 10, 50)
     const { data } = await supabase
       .from('messages')
-      .select('connection_id, created_at')
+      .select('id, connection_id, created_at, sender_id, read_at')
       .in('connection_id', connectionIds)
       .order('created_at', { ascending: false })
       .limit(rowLimit)
 
+    // A newer fetch was started while this one was in-flight — discard stale result.
+    if (seq !== fetchSeqRef.current) return
+
     if (data) {
-      const map: Record<string, string> = {}
-      ;(data as Pick<Message, 'connection_id' | 'created_at'>[]).forEach((msg) => {
-        if (!map[msg.connection_id]) map[msg.connection_id] = msg.created_at
+      const map: Record<string, LastMessageInfo> = {}
+      ;(data as Pick<Message, 'connection_id' | 'created_at' | 'sender_id' | 'read_at'>[]).forEach((msg) => {
+        if (!map[msg.connection_id]) {
+          map[msg.connection_id] = {
+            created_at: msg.created_at,
+            sender_id: msg.sender_id,
+            read_at: msg.read_at ?? null,
+          }
+        }
       })
-      setLastMessageAt(map)
+      setLastMessageInfo(map)
     }
   }, [connections, supabase])
 
@@ -137,11 +158,39 @@ export default function HomeClient({
           (payload) => {
             const msg = payload.new as Message
             if (connectionIds.has(msg.connection_id)) {
-              setLastMessageAt((prev) => ({
+              setLastMessageInfo((prev) => ({
                 ...prev,
-                [msg.connection_id]: msg.created_at,
+                [msg.connection_id]: {
+                  created_at: msg.created_at,
+                  sender_id: msg.sender_id,
+                  read_at: msg.read_at ?? null,
+                },
               }))
             }
+          }
+        )
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'messages' },
+          (payload) => {
+            // Read-receipts flip read_at — clear "unread" state on the affected
+            // connection. We only have access to the updated row's connection_id,
+            // and a row only matters if it's *this connection's most recent* row.
+            const msg = payload.new as Message
+            if (!connectionIds.has(msg.connection_id)) return
+            setLastMessageInfo((prev) => {
+              const cur = prev[msg.connection_id]
+              if (!cur) return prev
+              // Only react if this update is for the message we're tracking as
+              // "latest" (created_at matches) — older rows being updated don't
+              // change our unread state.
+              if (cur.created_at !== msg.created_at) return prev
+              if (cur.read_at === (msg.read_at ?? null)) return prev
+              return {
+                ...prev,
+                [msg.connection_id]: { ...cur, read_at: msg.read_at ?? null },
+              }
+            })
           }
         )
         .subscribe((status) => {
@@ -181,11 +230,58 @@ export default function HomeClient({
 
   const sortedConnections = useMemo(() => {
     return [...connections].sort((a, b) => {
-      const timeA = lastMessageAt[a.id] ?? a.created_at
-      const timeB = lastMessageAt[b.id] ?? b.created_at
+      const timeA = lastMessageInfo[a.id]?.created_at ?? a.created_at
+      const timeB = lastMessageInfo[b.id]?.created_at ?? b.created_at
       return new Date(timeB).getTime() - new Date(timeA).getTime()
     })
-  }, [connections, lastMessageAt])
+  }, [connections, lastMessageInfo])
+
+  // Clear the unread flag for whichever chat is open — markAsRead in
+  // useMessages hits the DB, the UPDATE subscription above propagates that
+  // back, but doing it locally too removes the round-trip latency.
+  useEffect(() => {
+    if (!selectedConnectionId) return
+    setLastMessageInfo((prev) => {
+      const cur = prev[selectedConnectionId]
+      if (!cur || cur.sender_id === currentUserId || cur.read_at) return prev
+      return {
+        ...prev,
+        [selectedConnectionId]: { ...cur, read_at: new Date().toISOString() },
+      }
+    })
+  }, [selectedConnectionId, currentUserId])
+
+  // Per-connection typing indicators for the connected list.
+  const connectionIdsList = useMemo(() => connections.map((c) => c.id), [connections])
+  const typingMap = useTypingForConnections(currentUserId, connectionIdsList)
+
+  // FLIP: animate cards smoothly when their position in the list changes.
+  // The actual slide-from-bottom-to-top happens when a new inbound message
+  // bumps a card to position 0.
+  const cardRefs = useRef(new Map<string, HTMLDivElement>())
+  const prevRectsRef = useRef(new Map<string, DOMRect>())
+  useLayoutEffect(() => {
+    const newRects = new Map<string, DOMRect>()
+    cardRefs.current.forEach((el, id) => {
+      if (el) newRects.set(id, el.getBoundingClientRect())
+    })
+    newRects.forEach((rect, id) => {
+      const prev = prevRectsRef.current.get(id)
+      if (!prev) return
+      const dy = prev.top - rect.top
+      if (dy === 0) return
+      const el = cardRefs.current.get(id)
+      if (!el || typeof el.animate !== 'function') return
+      el.animate(
+        [
+          { transform: `translateY(${dy}px)` },
+          { transform: 'translateY(0)' },
+        ],
+        { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+      )
+    })
+    prevRectsRef.current = newRects
+  }, [sortedConnections])
 
   const connectedIds = useMemo(
     () => new Set([...connections.map((c) => c.user_a), ...connections.map((c) => c.user_b)]),
@@ -254,16 +350,64 @@ export default function HomeClient({
                 <p className="text-white/20 text-xs">Send a connection request to get started.</p>
               </div>
             ) : (
-              <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
-                {sortedConnections.map((conn) => (
-                  <ConnectedCard
-                    key={conn.id}
-                    connection={conn}
-                    isSelected={conn.id === selectedConnectionId && chatPanelOpen}
-                    onChat={() => openChat(conn.id)}
-                  />
-                ))}
-              </div>
+              <>
+                {/* Filter toggle */}
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => setConnectedFilter('all')}
+                    className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
+                      connectedFilter === 'all'
+                        ? 'bg-white text-black'
+                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    All
+                  </button>
+                  <button
+                    onClick={() => setConnectedFilter('unread')}
+                    className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
+                      connectedFilter === 'unread'
+                        ? 'bg-white text-black'
+                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+                    }`}
+                  >
+                    Unread
+                  </button>
+                </div>
+
+                <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
+                  {(() => {
+                    const visible = sortedConnections
+                      .map((conn) => {
+                        const info = lastMessageInfo[conn.id]
+                        const hasUnread = !!(info && info.sender_id !== currentUserId && !info.read_at)
+                        return { conn, hasUnread }
+                      })
+                      .filter(({ hasUnread }) => connectedFilter === 'all' || hasUnread)
+
+                    if (visible.length === 0 && connectedFilter === 'unread') {
+                      return (
+                        <p className="text-white/30 text-sm mt-6 text-center">No unread chats.</p>
+                      )
+                    }
+
+                    return visible.map(({ conn, hasUnread }) => (
+                      <ConnectedCard
+                        key={conn.id}
+                        ref={(el: HTMLDivElement | null) => {
+                          if (el) cardRefs.current.set(conn.id, el)
+                          else cardRefs.current.delete(conn.id)
+                        }}
+                        connection={conn}
+                        isSelected={conn.id === selectedConnectionId && chatPanelOpen}
+                        isTyping={!!typingMap[conn.id]}
+                        hasUnread={hasUnread}
+                        onChat={() => openChat(conn.id)}
+                      />
+                    ))
+                  })()}
+                </div>
+              </>
             )}
           </section>
 

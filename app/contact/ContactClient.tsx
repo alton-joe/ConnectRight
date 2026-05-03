@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Button from '@/components/ui/Button'
+import BackButton from '@/components/layout/BackButton'
 
 const SUBJECTS = [
   'General Inquiry',
@@ -103,7 +104,10 @@ export default function ContactClient() {
 
   return (
     <div className="min-h-screen bg-black flex flex-col pt-24">
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-12 flex flex-col gap-16">
+      <div className="max-w-5xl mx-auto w-full px-4">
+        <BackButton />
+      </div>
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 pb-12 flex flex-col gap-16">
 
         {/* Hero */}
         <div className="flex flex-col items-center gap-3 text-center">

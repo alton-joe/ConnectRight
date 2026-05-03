@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import SiteFooter from '@/components/layout/SiteFooter'
+import BackButton from '@/components/layout/BackButton'
 
 // ─── Section label ────────────────────────────────────────────────────────────
 
@@ -149,10 +150,13 @@ const BELIEFS = [
 
 export default function AboutPage() {
   return (
-    <div className="bg-black flex flex-col">
+    <div className="bg-black flex flex-col pt-24">
+      <div className="max-w-5xl mx-auto w-full px-6">
+        <BackButton />
+      </div>
 
       {/* ── HERO ──────────────────────────────────── */}
-      <section className="relative overflow-hidden pt-32 pb-12 px-6 flex flex-col items-center text-center">
+      <section className="relative overflow-hidden pt-0 pb-12 px-6 flex flex-col items-center text-center">
         <NetworkDecoration />
 
         <span className="relative z-10 inline-block bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[11px] font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full mb-6">

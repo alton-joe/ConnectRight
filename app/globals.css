@@ -60,3 +60,22 @@
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  30% {
+    transform: translateY(-3px);
+    opacity: 1;
+  }
+}
+
+.typing-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background-color: rgba(255, 255, 255, 0.7);
+  animation: typingBounce 1s infinite ease-in-out;
+}

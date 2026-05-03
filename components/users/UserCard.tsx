@@ -28,16 +28,17 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
 
   const handleConnect = async () => {
     setOptimisticRequested(true)
-    const { error } = await supabase
-      .from('connection_requests')
-      .insert({ sender_id: currentUserId, receiver_id: profile.id })
+    // RPC because a raw INSERT fails with 23505 once any prior row exists for
+    // this (sender, receiver) pair — declined/accepted rows can't be revived
+    // by the sender under RLS. The RPC upserts back to 'pending'.
+    const { error } = await supabase.rpc('send_connection_request', {
+      target_id: profile.id,
+    })
 
     if (error) {
-      if (error.code === '23505') {
-        // Unique-violation — request already exists, keep optimistic state
-        return
-      }
-      // Any other error: confirm via a quick read before reverting
+      console.error('send_connection_request failed:', error)
+      // Confirm via a quick read before reverting — realtime may have already
+      // moved status to 'requested', in which case optimistic shadowing is fine.
       const { data: existing } = await supabase
         .from('connection_requests')
         .select('id')
@@ -47,8 +48,8 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
         .limit(1)
       if (!existing || existing.length === 0) setOptimisticRequested(false)
     }
-    // On success the hook's INSERT subscription fires, sets status → 'requested',
-    // which shadows the optimistic flag automatically.
+    // On success the hook's INSERT/UPDATE subscription fires, sets status →
+    // 'requested', which shadows the optimistic flag automatically.
   }
 
   const buttonContent = () => {

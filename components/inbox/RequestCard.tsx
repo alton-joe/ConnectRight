@@ -27,11 +27,13 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
         ),
       ])
       if (rpcError) {
-        setError('Failed to accept. Try again.')
+        console.error('accept_connection_request failed:', rpcError)
+        setError(rpcError.message || 'Failed to accept. Try again.')
         return
       }
       onRemove(request.id)
-    } catch {
+    } catch (err) {
+      console.error('accept_connection_request threw:', err)
       setError('Failed to accept. Try again.')
     } finally {
       setLoading(null)
@@ -52,11 +54,13 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
         ),
       ])
       if (updateError) {
-        setError('Failed to decline. Try again.')
+        console.error('decline request failed:', updateError)
+        setError(updateError.message || 'Failed to decline. Try again.')
         return
       }
       onRemove(request.id)
-    } catch {
+    } catch (err) {
+      console.error('decline request threw:', err)
       setError('Failed to decline. Try again.')
     } finally {
       setLoading(null)

@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useInbox } from '@/hooks/useInbox'
+import { useRealtime } from '@/providers/RealtimeProvider'
 import RequestCard from './RequestCard'
 
 interface InboxPanelProps {
@@ -10,8 +10,8 @@ interface InboxPanelProps {
   currentUserId: string
 }
 
-export default function InboxPanel({ isOpen, onClose, currentUserId }: InboxPanelProps) {
-  const { requests: hookRequests, refetch } = useInbox(currentUserId)
+export default function InboxPanel({ isOpen, onClose, currentUserId: _currentUserId }: InboxPanelProps) {
+  const { inboxRequests: hookRequests, refetchInbox: refetch } = useRealtime()
 
   // Optimistic removal overlay: IDs removed locally before the hook re-fetches.
   // Once the hook re-fetches (triggered by the UPDATE/DELETE realtime event),

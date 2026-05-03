@@ -32,6 +32,8 @@ export interface Message {
   sender_id: string
   content: string
   created_at: string
+  delivered_at?: string | null
+  read_at?: string | null
   sender?: { username: string }
 }
 

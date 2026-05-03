@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/useAuth'
 import { useActiveChat } from '@/context/ActiveChatContext'
-import { useInbox } from '@/hooks/useInbox'
+import { useRealtime } from '@/providers/RealtimeProvider'
 import InboxPanel from '@/components/inbox/InboxPanel'
 import { formatTime } from '@/utils/helpers'
 import type { Message, ChatNotification } from '@/types'
@@ -71,8 +71,7 @@ export default function GlobalHeader() {
   const [inboxOpen, setInboxOpen] = useState(false)
   const [signingIn, setSigningIn] = useState(false)
 
-  const { requests: pendingRequests } = useInbox(user?.id ?? '')
-  const pendingCount = pendingRequests.length
+  const { inboxCount: pendingCount, connections } = useRealtime()
 
   // Chat notification state
   const [chatNotifications, setChatNotifications] = useState<ChatNotification[]>([])
@@ -82,74 +81,25 @@ export default function GlobalHeader() {
   const notifChannelRef = useRef<RealtimeChannel | null>(null)
   const notifRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Map of connectionId → { username, avatarUrl }
-  const [connectionsMap, setConnectionsMap] = useState<Map<string, { username: string; avatarUrl: string | null }> | null>(null)
-
   const supabase = useMemo(() => createClient(), [])
+  const instanceId = useMemo(() => Math.random().toString(36).slice(2, 9), [])
 
-  const fetchConnectionsMap = useCallback(async () => {
-    if (!user || pathname === '/') return
-    try {
-      const { data } = await Promise.race([
-        supabase
-          .from('connections')
-          .select(`
-            id, user_a, user_b,
-            profile_a:profiles!connections_user_a_fkey(username, avatar_url),
-            profile_b:profiles!connections_user_b_fkey(username, avatar_url)
-          `)
-          .or(`user_a.eq.${user.id},user_b.eq.${user.id}`),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 10_000)
-        ),
-      ])
-      if (data) {
-        const map = new Map<string, { username: string; avatarUrl: string | null }>()
-        ;(data as any[]).forEach((row) => {
-          const rawOther = row.user_a === user.id ? row.profile_b : row.profile_a
-          const other = Array.isArray(rawOther) ? rawOther[0] : rawOther
-          if (other) map.set(row.id, { username: other.username, avatarUrl: other.avatar_url ?? null })
+  // Derive connectionId → other-user map from the live connections list in
+  // RealtimeProvider. Reacts to INSERT/UPDATE/DELETE automatically (the provider
+  // covers all three events), so removing a connection clears the map entry.
+  const connectionsMap = useMemo(() => {
+    if (!user) return null
+    const map = new Map<string, { username: string; avatarUrl: string | null }>()
+    connections.forEach((conn) => {
+      if (conn.other_user) {
+        map.set(conn.id, {
+          username: conn.other_user.username,
+          avatarUrl: conn.other_user.avatar_url ?? null,
         })
-        setConnectionsMap(map)
       }
-    } catch {
-      // Timeout or network error — keep current map
-    }
-  }, [user, pathname, supabase])
-
-  // Fetch connections to build connectionId → other-user map, and refresh whenever
-  // a new connection row is inserted (i.e. a request was accepted).
-  useEffect(() => {
-    if (!user || pathname === '/') return
-
-    fetchConnectionsMap()
-
-    // Refresh the map whenever the current user gains a new connection
-    const ch = supabase
-      .channel(`header-connections-map-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'connections' },
-        (payload) => {
-          const row = payload.new as { user_a: string; user_b: string }
-          if (row.user_a === user.id || row.user_b === user.id) {
-            fetchConnectionsMap()
-          }
-        }
-      )
-      .subscribe()
-
-    return () => { supabase.removeChannel(ch) }
-  }, [user, pathname, supabase, fetchConnectionsMap])
-
-  // Refresh connections map when tab becomes visible after idle
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') fetchConnectionsMap()
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [fetchConnectionsMap])
+    })
+    return map
+  }, [user, connections])
 
   // Keep activeChatRef in sync so the subscription callback always reads the latest value
   useEffect(() => {
@@ -176,7 +126,7 @@ export default function GlobalHeader() {
       }
 
       const channel = supabase
-        .channel(`header-chat-notifications-${user.id}`)
+        .channel(`header-chat-notifications-${user.id}-${instanceId}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -228,7 +178,7 @@ export default function GlobalHeader() {
         notifChannelRef.current = null
       }
     }
-  }, [user, connectionsMap, supabase])
+  }, [user, connectionsMap, supabase, instanceId])
 
   // Close notification panel when clicking outside
   useEffect(() => {

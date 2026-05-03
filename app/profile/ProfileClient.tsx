@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
+import BackButton from '@/components/layout/BackButton'
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { Profile } from '@/types'
 import { formatDate } from '@/utils/helpers'
@@ -77,7 +78,10 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
 
   return (
     <div className="min-h-screen bg-black flex flex-col pt-24">
-      <main className="flex-1 max-w-sm mx-auto w-full px-4 py-10 flex flex-col gap-6">
+      <div className="max-w-5xl mx-auto w-full px-4">
+        <BackButton />
+      </div>
+      <main className="flex-1 max-w-sm mx-auto w-full px-4 pb-10 flex flex-col gap-6">
 
         {/* Avatar */}
         <div className="flex flex-col items-center gap-3">
