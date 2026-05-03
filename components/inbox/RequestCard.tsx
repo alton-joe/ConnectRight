@@ -110,8 +110,8 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
         <div className="flex gap-2">
           <Button
             variant="primary"
-            size="sm"
-            className="flex-1"
+            size="md"
+            className="flex-1 min-h-11"
             onClick={handleAccept}
             disabled={loading !== null}
           >
@@ -119,8 +119,8 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
           </Button>
           <Button
             variant="ghost"
-            size="sm"
-            className="flex-1"
+            size="md"
+            className="flex-1 min-h-11"
             onClick={handleDecline}
             disabled={loading !== null}
           >

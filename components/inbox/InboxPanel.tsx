@@ -31,19 +31,21 @@ export default function InboxPanel({ isOpen, onClose, currentUserId: _currentUse
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — click outside the panel to close */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-30 bg-black/40"
+          className="fixed inset-0 z-[55] bg-black/40"
           onClick={onClose}
         />
       )}
 
-      {/* Panel */}
+      {/* Panel — full-screen on mobile, fixed-width right drawer on md+ */}
       <div
         className={`
-          fixed right-0 top-24 h-[calc(100vh-96px)] w-80 bg-zinc-900 border-l border-white/10 z-40
-          flex flex-col transform transition-transform duration-300
+          fixed right-0 top-16 md:top-24
+          h-[calc(100dvh-64px)] md:h-[calc(100vh-96px)]
+          w-full md:w-80 bg-zinc-900 md:border-l md:border-white/10 z-[60]
+          flex flex-col transform transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
@@ -52,7 +54,7 @@ export default function InboxPanel({ isOpen, onClose, currentUserId: _currentUse
           <h2 className="text-white font-semibold">Inbox</h2>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+            className="inline-flex items-center justify-center w-11 h-11 md:w-auto md:h-auto md:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
             aria-label="Close inbox"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

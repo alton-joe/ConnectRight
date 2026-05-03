@@ -31,7 +31,7 @@ function StatusTick({ delivered, read }: { delivered: boolean; read: boolean }) 
 export default function MessageBubble({ message, isOwnMessage }: MessageBubbleProps) {
   return (
     <div className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[75%] flex flex-col gap-1 ${isOwnMessage ? 'items-end' : 'items-start'}`}>
+      <div className={`max-w-[80%] md:max-w-[75%] flex flex-col gap-1 ${isOwnMessage ? 'items-end' : 'items-start'}`}>
         <div
           className={`
             px-4 py-2.5 text-sm leading-relaxed

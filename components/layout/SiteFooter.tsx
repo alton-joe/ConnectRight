@@ -1,7 +1,7 @@
 export default function SiteFooter() {
   return (
     <footer className="border-t border-white/10 bg-zinc-950">
-      <div className="max-w-5xl mx-auto px-6 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
+      <div className="max-w-5xl mx-auto px-6 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8">
 
         {/* Logo + tagline + contact */}
         <div className="flex flex-col gap-4">

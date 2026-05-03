@@ -15,10 +15,17 @@
     background-color: #000000;
     color: #ffffff;
     font-family: var(--font-sans);
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
   }
 
   * {
     box-sizing: border-box;
+  }
+
+  /* Removes the 300ms tap delay and prevents double-tap zoom on interactive elements */
+  button, a, [role="button"] {
+    touch-action: manipulation;
   }
 
   ::-webkit-scrollbar {
@@ -78,4 +85,19 @@
   border-radius: 9999px;
   background-color: rgba(255, 255, 255, 0.7);
   animation: typingBounce 1s infinite ease-in-out;
+}
+
+/* Mobile-aware viewport height — falls back to vh on browsers without dvh */
+.h-screen-dvh {
+  height: 100vh;
+  height: 100dvh;
+}
+.min-h-screen-dvh {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Safe-area padding for iOS home indicator */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }

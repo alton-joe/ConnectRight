@@ -146,11 +146,11 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
   const charCount = username.length
 
   return (
-    <div className="min-h-screen bg-black overflow-hidden relative flex items-center justify-center p-4">
+    <div className="min-h-screen-dvh bg-black overflow-hidden relative flex items-center justify-center p-4">
 
-      {/* ── Blurred app preview background ── */}
+      {/* ── Blurred app preview background — desktop only ── */}
       <div
-        className="fixed inset-0 pointer-events-none select-none"
+        className="hidden md:block fixed inset-0 pointer-events-none select-none"
         style={{ filter: 'blur(3px) brightness(0.28)', transform: 'scale(1.02)' }}
         aria-hidden="true"
       >

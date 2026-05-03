@@ -240,8 +240,11 @@ export default function ChatWindow({ connectionId, currentUserId }: ChatWindowPr
         </div>
       </div>
 
-      {/* Input area */}
-      <div className="shrink-0 border-t border-white/10 p-4 flex flex-col gap-2 bg-black">
+      {/* Input area — extra bottom padding on iOS for the home indicator */}
+      <div
+        className="shrink-0 border-t border-white/10 px-3 md:px-4 pt-3 md:pt-4 flex flex-col gap-2 bg-black"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
         {sendError && (
           <p className="text-red-400 text-xs px-1">
             {sendError}
@@ -250,10 +253,10 @@ export default function ChatWindow({ connectionId, currentUserId }: ChatWindowPr
             )}
           </p>
         )}
-        <div className="flex items-end gap-3">
+        <div className="flex items-end gap-2 md:gap-3">
           <textarea
             ref={textareaRef}
-            className={`flex-1 bg-white/5 border text-white placeholder:text-white/30 rounded-xl px-4 py-2.5 resize-none outline-none focus:border-white/30 transition-colors text-sm max-h-32 ${
+            className={`flex-1 bg-white/5 border text-white placeholder:text-white/30 rounded-xl px-4 py-2.5 resize-none outline-none focus:border-white/30 transition-colors text-base md:text-sm max-h-32 ${
               sendError ? 'border-red-500/60' : 'border-white/10'
             }`}
             placeholder="Type a message..."
@@ -266,7 +269,7 @@ export default function ChatWindow({ connectionId, currentUserId }: ChatWindowPr
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}
-            className="p-2.5 rounded-xl bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
+            className="inline-flex items-center justify-center w-11 h-11 rounded-xl bg-white text-black hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shrink-0"
             aria-label="Send message"
           >
             <svg

@@ -56,6 +56,17 @@ export default function HomeClient({
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const restoredFromUrl = useRef(false)
 
+  // Track desktop breakpoint (md+) so the inline grid-template-columns animation
+  // only runs on desktop. On mobile we stack vertically instead.
+  const [isDesktop, setIsDesktop] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const update = () => setIsDesktop(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [])
+
   const supabase = useMemo(() => createClient(), [])
   const homeChannelRef = useRef<RealtimeChannel | null>(null)
   const homeRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -64,6 +75,13 @@ export default function HomeClient({
   const fetchSeqRef = useRef(0)
 
   const openChat = (id: string) => {
+    // On mobile, route to the standalone chat page so it opens full-screen
+    // with its own back-button. The desktop two-pane experience is preserved
+    // on md+ via the inline chat panel.
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches) {
+      router.push(`/chat/${id}`)
+      return
+    }
     if (closeTimerRef.current) {
       clearTimeout(closeTimerRef.current)
       closeTimerRef.current = null
@@ -340,22 +358,28 @@ export default function HomeClient({
   const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
 
   return (
-    <div className="bg-black flex flex-col pt-24">
-      <div className="h-[calc(100vh-96px)] max-w-6xl w-full mx-auto px-4 py-6 flex flex-col">
+    <div className="bg-black flex flex-col pt-16 md:pt-24">
+      {/* On mobile: natural document flow, sections stack and content scrolls.
+          On md+: fixed-height workspace so the three-pane grid fills the viewport. */}
+      <div className="md:h-[calc(100vh-96px)] max-w-6xl w-full mx-auto px-4 py-4 md:py-6 flex flex-col">
         {/*
-          Always render 3 grid columns so grid-template-columns can interpolate
-          between the two states. The third column transitions from 0px → 2fr.
+          Mobile: single-column flex layout — Available stacks above Connected, full page scrolls.
+          md+: keep the original three-column interpolating grid (Available | Connected | Chat panel).
         */}
         <div
-          className="flex-1 min-h-0 grid gap-6"
-          style={{
-            gridTemplateColumns: chatPanelOpen ? '1fr 1fr 2fr' : '1.1fr 1.9fr 0px',
-            transition: 'grid-template-columns 350ms cubic-bezier(0.4, 0, 0.2, 1)',
-          }}
+          className="flex-1 min-h-0 flex flex-col md:grid gap-4 md:gap-6"
+          style={
+            isDesktop
+              ? {
+                  gridTemplateColumns: chatPanelOpen ? '1fr 1fr 2fr' : '1.1fr 1.9fr 0px',
+                  transition: 'grid-template-columns 350ms cubic-bezier(0.4, 0, 0.2, 1)',
+                }
+              : undefined
+          }
         >
 
           {/* LEFT — Available Users */}
-          <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 overflow-hidden">
+          <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col gap-4 md:overflow-hidden">
             <div className="flex items-center justify-between gap-2 shrink-0">
               <h2 className="text-white font-semibold text-base">Available Users</h2>
               <div className="flex items-center gap-2">
@@ -380,7 +404,7 @@ export default function HomeClient({
                     )}
                   </button>
                   {interestFilterOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-30 w-72 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-3">
+                    <div className="absolute right-0 top-full mt-2 z-30 w-[min(18rem,calc(100vw-2rem))] bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-3">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-white/60 text-xs">Filter by interest <span className="text-white/30">(max 5)</span></p>
                         <span className={`text-[11px] tabular-nums ${interestFilter.length >= MAX_INTERESTS ? 'text-white' : 'text-white/40'}`}>
@@ -479,7 +503,7 @@ export default function HomeClient({
                 )}
               </div>
             ) : (
-              <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
+              <div className="flex flex-col gap-3 md:flex-1 md:overflow-y-auto">
                 {availableProfiles.map((profile) => (
                   <UserCard
                     key={profile.id}
@@ -493,7 +517,7 @@ export default function HomeClient({
           </section>
 
           {/* MIDDLE (or RIGHT when no chat) — Connected list */}
-          <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 overflow-hidden">
+          <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col gap-4 md:overflow-hidden">
             <h2 className="text-white font-semibold text-base shrink-0">Connected</h2>
             {connections.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
@@ -529,7 +553,7 @@ export default function HomeClient({
                   </button>
                 </div>
 
-                <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
+                <div className="flex flex-col gap-3 md:flex-1 md:overflow-y-auto">
                   {(() => {
                     const visible = sortedConnections
                       .map((conn) => {
@@ -566,11 +590,12 @@ export default function HomeClient({
           </section>
 
           {/*
-            RIGHT — Chat panel. Always in the DOM so CSS transitions work.
+            RIGHT — Chat panel. Hidden on mobile; on mobile the chat opens
+            full-screen via /chat/[connectionId]. md+ keeps the desktop slide-in.
             overflow-hidden on the wrapper clips content during the column collapse.
             The inner section fades + slides in/out independently.
           */}
-          <div className="overflow-hidden min-w-0">
+          <div className="hidden md:block overflow-hidden min-w-0">
             <section
               className="bg-zinc-900 border border-white/10 flex flex-col overflow-hidden"
               style={fullscreenChat ? {

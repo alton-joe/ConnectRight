@@ -30,8 +30,8 @@ export default function LandingPage() {
 
   return (
     <div className="bg-black flex flex-col">
-      {/* Hero — pt-20 clears the fixed global header */}
-      <section className="pt-32 pb-8 px-6 text-center flex flex-col items-center gap-4">
+      {/* Hero — pt clears the fixed global header (h-16 mobile / h-24 desktop) */}
+      <section className="pt-24 md:pt-32 pb-8 px-4 md:px-6 text-center flex flex-col items-center gap-4">
         <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight max-w-2xl">
           Find the right people.{' '}
           <span className="text-white/40">Connect instantly.</span>
@@ -43,7 +43,7 @@ export default function LandingPage() {
       </section>
 
       {/* Blurred users section */}
-      <section className="relative max-w-5xl mx-auto w-full px-6 pb-24">
+      <section className="relative max-w-5xl mx-auto w-full px-4 md:px-6 pb-24">
         <h2 className="text-white/60 text-sm font-medium mb-4 uppercase tracking-widest">
           Available Users
         </h2>
@@ -89,7 +89,7 @@ export default function LandingPage() {
               <button
                 onClick={handleSignUp}
                 disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 bg-white text-black font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 hover:scale-[1.03] hover:shadow-lg active:scale-[0.99] transition-all duration-200 ease-out text-sm disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 bg-white text-black font-semibold px-4 py-3 min-h-11 rounded-xl hover:bg-gray-50 hover:scale-[1.03] hover:shadow-lg active:scale-[0.99] transition-all duration-200 ease-out text-sm disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
               >
                 <GoogleIcon size={16} />
                 {loading ? 'Redirecting...' : 'Sign up with Google'}

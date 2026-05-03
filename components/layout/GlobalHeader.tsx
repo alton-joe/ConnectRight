@@ -264,23 +264,23 @@ export default function GlobalHeader() {
 
   return (
     <>
-      <header className="fixed top-0 left-0 right-0 h-24 bg-black border-b border-white/10 flex items-center justify-between px-6 z-40">
+      <header className="fixed top-0 left-0 right-0 h-16 md:h-24 bg-black border-b border-white/10 flex items-center justify-between px-4 md:px-6 z-40">
         {/* Brand */}
         <Link
           href="/"
-          className="font-bold text-3xl tracking-tight hover:opacity-80 transition-opacity shrink-0 flex items-center"
+          className="font-bold text-xl md:text-3xl tracking-tight hover:opacity-80 transition-opacity shrink-0 flex items-center"
         >
           <span className="text-white">Connect</span>
           <span className="text-orange-500">Right</span>
           <span className="text-white ml-1">.</span>
         </Link>
 
-        {/* Center — typewriter on landing, nav links elsewhere */}
-        <div className="absolute left-1/2 -translate-x-1/2">
+        {/* Center — typewriter on landing (md+ only), nav links elsewhere (md+ only) */}
+        <div className="absolute left-1/2 -translate-x-1/2 hidden md:block">
           {pathname === '/' ? (
             <TypewriterWord />
           ) : (
-            <nav className="hidden md:flex items-center gap-6">
+            <nav className="flex items-center gap-6">
               {NAV_LINKS.map(({ label, href }) => (
                 <Link
                   key={label}
@@ -309,7 +309,7 @@ export default function GlobalHeader() {
             <button
               onClick={handleSignUp}
               disabled={signingIn}
-              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-4 py-2 rounded-xl hover:bg-gray-50 hover:scale-[1.05] hover:shadow-lg active:scale-[0.98] transition-all duration-200 ease-out disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-4 py-2.5 min-h-11 rounded-xl hover:bg-gray-50 hover:scale-[1.05] hover:shadow-lg active:scale-[0.98] transition-all duration-200 ease-out disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
             >
               {signingIn ? 'Redirecting...' : 'Sign Up'}
             </button>
@@ -319,7 +319,7 @@ export default function GlobalHeader() {
               <div className="relative" ref={notifPanelRef}>
                 <button
                   onClick={() => setNotifOpen((o) => !o)}
-                  className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                  className="relative inline-flex items-center justify-center w-11 h-11 md:w-auto md:h-auto md:p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                   aria-label="Chat notifications"
                 >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -334,7 +334,7 @@ export default function GlobalHeader() {
 
                 {/* Notification dropdown */}
                 {notifOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-80 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50">
+                  <div className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-xs sm:w-80 sm:max-w-none bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-30">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                       <span className="text-white text-sm font-semibold">Messages</span>
                       {chatNotifications.length > 0 && (
@@ -385,7 +385,7 @@ export default function GlobalHeader() {
                   setInboxOpen(true)
                   setSeenInboxCount(pendingCount)
                 }}
-                className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                className="relative inline-flex items-center justify-center w-11 h-11 md:w-auto md:h-auto md:p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                 aria-label="Open inbox"
               >
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -401,7 +401,7 @@ export default function GlobalHeader() {
 
               <Link
                 href="/profile"
-                className="flex items-center gap-2 pl-1 pr-3 py-1 ml-1 text-white/80 hover:text-white transition-colors"
+                className="flex items-center gap-2 pl-1 pr-1 sm:pr-3 py-1 ml-1 min-h-11 text-white/80 hover:text-white transition-colors"
                 aria-label="View profile"
               >
                 <UserAvatar
@@ -410,7 +410,7 @@ export default function GlobalHeader() {
                   size={28}
                 />
                 {profile?.username && (
-                  <span className="text-sm font-medium max-w-[140px] truncate">{profile.username}</span>
+                  <span className="hidden sm:inline text-sm font-medium max-w-[140px] truncate">{profile.username}</span>
                 )}
               </Link>
             </>

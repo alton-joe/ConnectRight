@@ -19,8 +19,8 @@ function DetailTable({ rows }: { rows: [string, string][] }) {
 
 export default function CookiesPage() {
   return (
-    <div className="min-h-screen bg-black pt-24 pb-16">
-      <div className="max-w-3xl mx-auto px-6">
+    <div className="min-h-screen bg-black pt-16 md:pt-24 pb-16">
+      <div className="max-w-3xl mx-auto px-4 md:px-6">
 
         {/* Back button */}
         <Link

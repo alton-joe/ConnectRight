@@ -23,8 +23,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-white tracking-tight">ConnectRight</h1>
+        <div className="text-center mb-8 md:mb-10">
+          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">ConnectRight</h1>
           <p className="mt-2 text-white/50 text-sm">Find the right match. Chat in real time.</p>
         </div>
 

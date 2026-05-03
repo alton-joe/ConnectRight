@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import BackButton from '@/components/layout/BackButton'
 import UserAvatar from '@/components/ui/UserAvatar'
+import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toaster'
 import type { Profile } from '@/types'
 import { formatDate } from '@/utils/helpers'
@@ -214,7 +215,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black flex flex-col pt-24">
+    <div className="min-h-screen bg-black flex flex-col pt-16 md:pt-24">
       <div className="max-w-5xl mx-auto w-full px-4">
         <BackButton />
       </div>
@@ -237,7 +238,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
           </div>
           <button
             onClick={() => setPickingAvatar((v) => !v)}
-            className="text-xs text-orange-400 hover:text-orange-300 transition-colors"
+            className="inline-flex items-center justify-center min-h-9 px-3 text-xs text-orange-400 hover:text-orange-300 transition-colors"
           >
             {pickingAvatar ? 'Cancel' : 'Change avatar'}
           </button>
@@ -427,110 +428,96 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
         </div>
 
         {/* Username change — one-time warning */}
-        {confirmUsernameOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => setConfirmUsernameOpen(false)}
-          >
-            <div
-              className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/15 text-red-400">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-                  <line x1="12" y1="9" x2="12" y2="13"/>
-                  <line x1="12" y1="17" x2="12.01" y2="17"/>
-                </svg>
-              </div>
-              <h2 className="text-white font-bold text-lg text-center">Change username — last time</h2>
-              <p className="text-white/60 text-sm text-center mt-2 leading-relaxed">
-                You can only change your username <span className="text-white font-semibold">once</span> after signup. Once saved, this action cannot be undone and the username will be locked permanently.
-              </p>
-              <div className="flex gap-2 mt-5">
-                <button
-                  onClick={() => setConfirmUsernameOpen(false)}
-                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm cursor-pointer transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => { setConfirmUsernameOpen(false); beginUsernameEdit() }}
-                  className="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 cursor-pointer transition-colors"
-                >
-                  Proceed
-                </button>
-              </div>
-            </div>
+        <Modal
+          isOpen={confirmUsernameOpen}
+          onClose={() => setConfirmUsernameOpen(false)}
+        >
+          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/15 text-red-400">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
           </div>
-        )}
+          <h2 className="text-white font-bold text-lg text-center">Change username — last time</h2>
+          <p className="text-white/60 text-sm text-center mt-2 leading-relaxed">
+            You can only change your username <span className="text-white font-semibold">once</span> after signup. Once saved, this action cannot be undone and the username will be locked permanently.
+          </p>
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={() => setConfirmUsernameOpen(false)}
+              className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm cursor-pointer transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => { setConfirmUsernameOpen(false); beginUsernameEdit() }}
+              className="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 cursor-pointer transition-colors"
+            >
+              Proceed
+            </button>
+          </div>
+        </Modal>
 
         {/* Interests editor modal */}
-        {editingInterests && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-            onClick={() => !savingInterests && setEditingInterests(false)}
-          >
-            <div
-              className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start gap-3 mb-4">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-white font-bold text-base leading-none">Edit your interests</h2>
-                  <p className="text-white/35 text-xs mt-1">Pick at least one</p>
-                </div>
-                <span className={`text-xs tabular-nums shrink-0 ${draftInterests.length >= MAX_INTERESTS ? 'text-orange-400' : 'text-white/40'}`}>
-                  {draftInterests.length}/{MAX_INTERESTS}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2.5">
-                {INTERESTS.map((it) => {
-                  const selected = draftInterests.includes(it.id)
-                  const atLimit = draftInterests.length >= MAX_INTERESTS && !selected
-                  return (
-                    <button
-                      key={it.id}
-                      type="button"
-                      onClick={() => toggleDraftInterest(it.id)}
-                      disabled={atLimit || savingInterests}
-                      className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-xl border transition-all duration-150 ${
-                        selected
-                          ? 'border-orange-500 bg-orange-500/10 text-orange-400'
-                          : atLimit
-                          ? 'border-white/8 bg-white/3 text-white/25 cursor-not-allowed'
-                          : 'border-white/8 bg-white/3 text-white/55 hover:border-white/20 hover:bg-white/6 hover:text-white/80'
-                      }`}
-                    >
-                      <span className="shrink-0">{it.icon}</span>
-                      <span className="text-[11px] font-medium leading-none text-center">{it.label}</span>
-                    </button>
-                  )
-                })}
-              </div>
-
-              {interestsError && <p className="text-red-400 text-xs mt-3">{interestsError}</p>}
-
-              <div className="flex gap-2 mt-5">
-                <button
-                  onClick={() => setEditingInterests(false)}
-                  disabled={savingInterests}
-                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm transition-colors disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveInterests}
-                  disabled={savingInterests || draftInterests.length < 1}
-                  className="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                >
-                  {savingInterests ? 'Saving…' : 'Save'}
-                </button>
-              </div>
+        <Modal
+          isOpen={editingInterests}
+          onClose={() => { if (!savingInterests) setEditingInterests(false) }}
+        >
+          <div className="flex items-start gap-3 mb-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-white font-bold text-base leading-none">Edit your interests</h2>
+              <p className="text-white/35 text-xs mt-1">Pick at least one</p>
             </div>
+            <span className={`text-xs tabular-nums shrink-0 ${draftInterests.length >= MAX_INTERESTS ? 'text-orange-400' : 'text-white/40'}`}>
+              {draftInterests.length}/{MAX_INTERESTS}
+            </span>
           </div>
-        )}
+
+          <div className="grid grid-cols-3 gap-2.5">
+            {INTERESTS.map((it) => {
+              const selected = draftInterests.includes(it.id)
+              const atLimit = draftInterests.length >= MAX_INTERESTS && !selected
+              return (
+                <button
+                  key={it.id}
+                  type="button"
+                  onClick={() => toggleDraftInterest(it.id)}
+                  disabled={atLimit || savingInterests}
+                  className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-xl border transition-all duration-150 ${
+                    selected
+                      ? 'border-orange-500 bg-orange-500/10 text-orange-400'
+                      : atLimit
+                      ? 'border-white/8 bg-white/3 text-white/25 cursor-not-allowed'
+                      : 'border-white/8 bg-white/3 text-white/55 hover:border-white/20 hover:bg-white/6 hover:text-white/80'
+                  }`}
+                >
+                  <span className="shrink-0">{it.icon}</span>
+                  <span className="text-[11px] font-medium leading-none text-center">{it.label}</span>
+                </button>
+              )
+            })}
+          </div>
+
+          {interestsError && <p className="text-red-400 text-xs mt-3">{interestsError}</p>}
+
+          <div className="flex gap-2 mt-5">
+            <button
+              onClick={() => setEditingInterests(false)}
+              disabled={savingInterests}
+              className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveInterests}
+              disabled={savingInterests || draftInterests.length < 1}
+              className="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {savingInterests ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </Modal>
 
         {/* Sign out */}
         <Button

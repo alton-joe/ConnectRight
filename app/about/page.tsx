@@ -150,7 +150,7 @@ const BELIEFS = [
 
 export default function AboutPage() {
   return (
-    <div className="bg-black flex flex-col pt-24">
+    <div className="bg-black flex flex-col pt-16 md:pt-24">
       <div className="max-w-5xl mx-auto w-full px-6">
         <BackButton />
       </div>

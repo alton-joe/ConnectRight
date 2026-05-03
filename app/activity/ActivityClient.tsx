@@ -226,7 +226,7 @@ export default function ActivityClient({
   )
 
   return (
-    <div className="min-h-screen bg-black flex flex-col pt-24">
+    <div className="min-h-screen bg-black flex flex-col pt-16 md:pt-24">
       <div className="max-w-6xl mx-auto w-full px-4">
         <BackButton />
       </div>

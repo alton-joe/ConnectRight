@@ -40,16 +40,16 @@ export default async function ChatPage({ params }: ChatPageProps) {
   const otherUser = Array.isArray(otherUserArr) ? otherUserArr[0] : otherUserArr
 
   return (
-    // pt-14 offsets the fixed global header; the inner sub-header + chat fill the rest
-    <div className="flex flex-col h-screen bg-black pt-24">
+    // Full-screen on mobile (offset by mobile h-16 header), full-screen on desktop too (offset by h-24)
+    <div className="flex flex-col h-screen-dvh bg-black pt-16 md:pt-24">
       {/* Chat sub-header: back button + other user's name */}
-      <div className="shrink-0 h-12 border-b border-white/10 flex items-center gap-3 px-4">
+      <div className="shrink-0 h-12 border-b border-white/10 flex items-center gap-2 px-3 md:px-4">
         <Link
           href="/home"
-          className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+          className="inline-flex items-center justify-center w-11 h-11 md:w-auto md:h-auto md:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           aria-label="Back to home"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </Link>
@@ -64,7 +64,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
       </div>
 
       {/* Chat window fills remaining height */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden min-h-0">
         <ActiveChatSetter connectionId={connectionId} />
         <ChatWindow connectionId={connectionId} currentUserId={user.id} />
       </div>

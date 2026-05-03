@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#000000"/>
+  <!-- Two-nodes-connected mark: white left node, orange right node, white connection line -->
+  <line x1="172" y1="256" x2="340" y2="256" stroke="#ffffff" stroke-width="20" stroke-linecap="round"/>
+  <circle cx="172" cy="256" r="48" fill="#ffffff"/>
+  <circle cx="340" cy="256" r="48" fill="#f97316"/>
+</svg>
