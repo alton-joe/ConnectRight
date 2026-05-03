@@ -68,6 +68,11 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Excludes Next.js internals, favicon, common image extensions, and the PWA
+    // assets (manifest.json, sw.js, /icons/*). Without these exclusions the
+    // middleware redirects unauthenticated requests for /manifest.json to / and
+    // the browser fails to parse the returned HTML as JSON ("Manifest: Syntax
+    // error" in DevTools console).
+    '/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|icons/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
