@@ -3,6 +3,7 @@ import './globals.css'
 import GlobalHeader from '@/components/layout/GlobalHeader'
 import Providers from '@/components/layout/Providers'
 import PWARegistration from '@/components/layout/PWARegistration'
+import InstallGate from '@/components/pwa/InstallGate'
 
 export const metadata: Metadata = {
   title: 'ConnectRight',
@@ -36,8 +37,10 @@ export default function RootLayout({
     <html lang="en" className="h-full">
       <body className="min-h-full bg-black text-white antialiased">
         <Providers>
-          <GlobalHeader />
-          {children}
+          <InstallGate>
+            <GlobalHeader />
+            {children}
+          </InstallGate>
         </Providers>
         <PWARegistration />
       </body>
