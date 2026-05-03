@@ -73,6 +73,17 @@ export default function GlobalHeader() {
 
   const { inboxCount: pendingCount, connections } = useRealtime()
 
+  // Track how many requests the user has already seen so the badge clears once
+  // they open the inbox. New requests arriving after that bump pendingCount past
+  // seenInboxCount and the badge re-appears.
+  const [seenInboxCount, setSeenInboxCount] = useState(0)
+  useEffect(() => {
+    // If requests are accepted/declined the source count drops — keep "seen"
+    // clamped so a later increase reliably re-shows the badge.
+    if (pendingCount < seenInboxCount) setSeenInboxCount(pendingCount)
+  }, [pendingCount, seenInboxCount])
+  const unseenInboxCount = Math.max(0, pendingCount - seenInboxCount)
+
   // Chat notification state
   const [chatNotifications, setChatNotifications] = useState<ChatNotification[]>([])
   const [notifOpen, setNotifOpen] = useState(false)
@@ -322,7 +333,10 @@ export default function GlobalHeader() {
 
               {/* Connection request inbox */}
               <button
-                onClick={() => setInboxOpen(true)}
+                onClick={() => {
+                  setInboxOpen(true)
+                  setSeenInboxCount(pendingCount)
+                }}
                 className="relative p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
                 aria-label="Open inbox"
               >
@@ -330,9 +344,9 @@ export default function GlobalHeader() {
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
                   <path d="M13.73 21a2 2 0 0 1-3.46 0" />
                 </svg>
-                {pendingCount > 0 && (
+                {unseenInboxCount > 0 && (
                   <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-0.5">
-                    {pendingCount > 99 ? '99+' : pendingCount}
+                    {unseenInboxCount > 99 ? '99+' : unseenInboxCount}
                   </span>
                 )}
               </button>
