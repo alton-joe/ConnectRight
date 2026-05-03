@@ -5,6 +5,7 @@ export interface Profile {
   avatar_url: string | null
   region: string | null
   interests: string[] | null
+  username_change_count: number
   last_active: string
   created_at: string
 }

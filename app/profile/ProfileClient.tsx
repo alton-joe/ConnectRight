@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
@@ -34,6 +34,17 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
   const [editingInterests, setEditingInterests] = useState(false)
   const [savingInterests, setSavingInterests] = useState(false)
   const [interestsError, setInterestsError] = useState('')
+
+  // Username editing — limited to a single change after signup.
+  const [username, setUsername] = useState(profile.username)
+  const [usernameChangeCount, setUsernameChangeCount] = useState(profile.username_change_count ?? 0)
+  const [confirmUsernameOpen, setConfirmUsernameOpen] = useState(false)
+  const [editingUsername, setEditingUsername] = useState(false)
+  const [usernameDraft, setUsernameDraft] = useState('')
+  const [usernameError, setUsernameError] = useState('')
+  const [usernameAvailability, setUsernameAvailability] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [savingUsername, setSavingUsername] = useState(false)
+  const canEditUsername = usernameChangeCount < 1
 
   const router = useRouter()
 
@@ -107,6 +118,84 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
     setInterests(draftInterests)
     setEditingInterests(false)
     showToast('Interests updated', 'success')
+  }
+
+  const supabaseClient = useMemo(() => createClient(), [])
+
+  // Debounced availability check while editing the username.
+  useEffect(() => {
+    if (!editingUsername) return
+    const trimmed = usernameDraft.trim()
+    if (trimmed === profile.username) { setUsernameAvailability('idle'); return }
+    const formatOk = trimmed.length >= 3 && trimmed.length <= 20 && /^[a-zA-Z0-9_]+$/.test(trimmed)
+    if (!formatOk) { setUsernameAvailability('idle'); return }
+    setUsernameAvailability('checking')
+    let cancelled = false
+    const timer = setTimeout(async () => {
+      const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id')
+        .eq('username', trimmed)
+        .maybeSingle()
+      if (cancelled) return
+      if (error) { setUsernameAvailability('available'); return }
+      setUsernameAvailability(data ? 'taken' : 'available')
+    }, 400)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [usernameDraft, editingUsername, profile.username, supabaseClient])
+
+  const beginUsernameEdit = () => {
+    setUsernameDraft(profile.username)
+    setUsernameError('')
+    setUsernameAvailability('idle')
+    setEditingUsername(true)
+  }
+
+  const cancelUsernameEdit = () => {
+    setEditingUsername(false)
+    setUsernameDraft('')
+    setUsernameError('')
+    setUsernameAvailability('idle')
+  }
+
+  const handleSaveUsername = async () => {
+    const trimmed = usernameDraft.trim()
+    if (trimmed === username) { cancelUsernameEdit(); return }
+    if (trimmed.length < 3 || trimmed.length > 20) {
+      setUsernameError('Username must be 3–20 characters.')
+      return
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameError('Letters, numbers, and underscores only.')
+      return
+    }
+    if (usernameAvailability === 'taken') {
+      setUsernameError('That username is already taken.')
+      return
+    }
+    setSavingUsername(true)
+    setUsernameError('')
+    const { error } = await supabaseClient
+      .from('profiles')
+      .update({ username: trimmed })
+      .eq('id', profile.id)
+    setSavingUsername(false)
+    if (error) {
+      // 23505 = unique violation; trigger raises a generic exception when cap reached.
+      if (error.code === '23505') {
+        setUsernameError('That username was just taken. Pick another.')
+      } else if (error.message.toLowerCase().includes('username can only be changed once')) {
+        setUsernameError('You have already used your one allowed change.')
+        setUsernameChangeCount(1)
+      } else {
+        setUsernameError('Failed to save. Try again.')
+      }
+      return
+    }
+    setUsername(trimmed)
+    setUsernameChangeCount((c) => c + 1)
+    setEditingUsername(false)
+    showToast(`Username changed to @${trimmed}`, 'success')
   }
 
   const handleSelectAvatar = async (id: AnimalId) => {
@@ -197,8 +286,69 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
         {/* Info card */}
         <div className="bg-zinc-900 border border-white/10 rounded-xl">
           <div className="px-4 py-3">
-            <p className="text-white/40 text-xs mb-1">Username</p>
-            <p className="text-white text-sm">{profile.username}</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-white/40 text-xs">Username</p>
+              {!editingUsername && canEditUsername && (
+                <button
+                  onClick={() => setConfirmUsernameOpen(true)}
+                  className="text-xs text-orange-400 hover:text-orange-300 cursor-pointer transition-colors"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {editingUsername ? (
+              <div className="flex flex-col gap-2">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 text-sm select-none">@</span>
+                  <input
+                    type="text"
+                    value={usernameDraft}
+                    onChange={(e) => { setUsernameDraft(e.target.value); if (usernameError) setUsernameError('') }}
+                    placeholder="Johnny_depp"
+                    maxLength={20}
+                    autoFocus
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={`w-full bg-zinc-800 border rounded-lg pl-7 pr-3 py-1.5 text-white text-sm placeholder-white/30 focus:outline-none transition-colors ${
+                      usernameError || usernameAvailability === 'taken'
+                        ? 'border-red-500/60 focus:border-red-500'
+                        : usernameAvailability === 'available'
+                        ? 'border-green-500/40 focus:border-green-500/60'
+                        : 'border-white/10 focus:border-orange-500'
+                    }`}
+                  />
+                </div>
+                {usernameAvailability === 'checking' && (
+                  <p className="text-white/40 text-xs">Checking availability…</p>
+                )}
+                {usernameAvailability === 'available' && (
+                  <p className="text-green-500 text-xs">Username is available</p>
+                )}
+                {usernameAvailability === 'taken' && (
+                  <p className="text-red-400 text-xs">Username already taken</p>
+                )}
+                {usernameError && <p className="text-red-400 text-xs">{usernameError}</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveUsername}
+                    disabled={savingUsername || usernameAvailability === 'checking'}
+                    className="text-xs bg-orange-500 hover:bg-orange-400 disabled:opacity-50 text-white px-3 py-1 rounded-lg cursor-pointer transition-colors"
+                  >
+                    {savingUsername ? 'Saving…' : 'Save'}
+                  </button>
+                  <button
+                    onClick={cancelUsernameEdit}
+                    disabled={savingUsername}
+                    className="text-xs text-white/50 hover:text-white px-3 py-1 rounded-lg cursor-pointer transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-white text-sm">{username}</p>
+            )}
           </div>
           <div className="px-4 py-3">
             <p className="text-white/40 text-xs mb-1">Email</p>
@@ -275,6 +425,45 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
             <p className="text-white text-sm">{formatDate(profile.created_at)}</p>
           </div>
         </div>
+
+        {/* Username change — one-time warning */}
+        {confirmUsernameOpen && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setConfirmUsernameOpen(false)}
+          >
+            <div
+              className="bg-zinc-950 border border-white/10 rounded-2xl p-6 w-full max-w-sm shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-500/15 text-red-400">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/>
+                  <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <h2 className="text-white font-bold text-lg text-center">Change username — last time</h2>
+              <p className="text-white/60 text-sm text-center mt-2 leading-relaxed">
+                You can only change your username <span className="text-white font-semibold">once</span> after signup. Once saved, this action cannot be undone and the username will be locked permanently.
+              </p>
+              <div className="flex gap-2 mt-5">
+                <button
+                  onClick={() => setConfirmUsernameOpen(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => { setConfirmUsernameOpen(false); beginUsernameEdit() }}
+                  className="flex-1 py-2.5 rounded-xl bg-white text-black font-semibold text-sm hover:bg-gray-100 cursor-pointer transition-colors"
+                >
+                  Proceed
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Interests editor modal */}
         {editingInterests && (
