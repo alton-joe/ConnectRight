@@ -20,7 +20,7 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
   const [optimisticRequested, setOptimisticRequested] = useState(false)
   const supabase = useMemo(() => createClient(), [])
 
-  const { status, loading: statusLoading } = useRelationshipStatus(currentUserId, profile.id)
+  const { status } = useRelationshipStatus(currentUserId, profile.id)
 
   // While the hook is still on its initial fetch, apply any optimistic override.
   // Once the hook returns a real status, the optimistic flag is shadowed.
@@ -53,13 +53,6 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
   }
 
   const buttonContent = () => {
-    if (statusLoading && displayStatus === 'none' && !optimisticRequested) {
-      return (
-        <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>
-          …
-        </Button>
-      )
-    }
     if (displayStatus === 'connected') {
       return (
         <Button variant="ghost" size="sm" className={compact ? '!py-0.5 !text-xs' : ''} disabled>

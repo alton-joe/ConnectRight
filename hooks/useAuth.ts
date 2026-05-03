@@ -34,15 +34,17 @@ export function useAuth(): UseAuthReturn {
     // onAuthStateChange fires INITIAL_SESSION immediately, covering the initial
     // load without a second getUser() HTTP round-trip.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_, session) => {
+      (_, session) => {
         if (!mountedRef.current) return
         setUser(session?.user ?? null)
+        // Resolve loading as soon as we know auth state — don't block on the
+        // profile fetch, so consumers can render auth-gated UI immediately.
+        setLoading(false)
         if (session?.user) {
-          await fetchProfile(session.user.id)
+          fetchProfile(session.user.id)
         } else {
           setProfile(null)
         }
-        if (mountedRef.current) setLoading(false)
       }
     )
 
