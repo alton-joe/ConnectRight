@@ -3,6 +3,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import UserCard from '@/components/users/UserCard'
+import ViewProfileModal from '@/components/users/ViewProfileModal'
 import WelcomePopup from '@/components/auth/WelcomePopup'
 import ConnectedCard from './ConnectedCard'
 import ChatWindow from '@/components/chat/ChatWindow'
@@ -41,6 +42,7 @@ export default function HomeClient({
   const { setActiveChatConnectionId } = useActiveChat()
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
   const [fullscreenChat, setFullscreenChat] = useState(false)
+  const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [connectedFilter, setConnectedFilter] = useState<'all' | 'unread'>('all')
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
@@ -451,24 +453,32 @@ export default function HomeClient({
                         <line x1="6" y1="6" x2="18" y2="18"/>
                       </svg>
                     </button>
-                    <div className="relative shrink-0">
-                      <UserAvatar
-                        username={selectedConnection?.other_user?.username ?? '?'}
-                        avatarUrl={selectedConnection?.other_user?.avatar_url}
-                        size={32}
-                      />
-                      {selectedConnection?.other_user && Date.now() - new Date(selectedConnection.other_user.last_active).getTime() < 5 * 60 * 1000 && (
-                        <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-zinc-900" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-white font-medium text-sm truncate">
-                        {selectedConnection?.other_user?.username ?? 'Unknown'}
-                      </p>
-                      {selectedConnection?.other_user && Date.now() - new Date(selectedConnection.other_user.last_active).getTime() < 5 * 60 * 1000 && (
-                        <p className="text-green-500 text-[11px] leading-none mt-0.5">Active now</p>
-                      )}
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { if (selectedConnection?.other_user) setProfileModalOpen(true) }}
+                      disabled={!selectedConnection?.other_user}
+                      className="flex items-center gap-3 flex-1 min-w-0 text-left rounded-lg -mx-1 px-1 py-0.5 hover:bg-white/5 transition-colors cursor-pointer disabled:cursor-default disabled:hover:bg-transparent"
+                      aria-label="View profile"
+                    >
+                      <div className="relative shrink-0">
+                        <UserAvatar
+                          username={selectedConnection?.other_user?.username ?? '?'}
+                          avatarUrl={selectedConnection?.other_user?.avatar_url}
+                          size={32}
+                        />
+                        {selectedConnection?.other_user && Date.now() - new Date(selectedConnection.other_user.last_active).getTime() < 5 * 60 * 1000 && (
+                          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 border-2 border-zinc-900" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-medium text-sm truncate">
+                          {selectedConnection?.other_user?.username ?? 'Unknown'}
+                        </p>
+                        {selectedConnection?.other_user && Date.now() - new Date(selectedConnection.other_user.last_active).getTime() < 5 * 60 * 1000 && (
+                          <p className="text-green-500 text-[11px] leading-none mt-0.5">Active now</p>
+                        )}
+                      </div>
+                    </button>
                     <button
                       onClick={() => setFullscreenChat(f => !f)}
                       className="text-white/40 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5 ml-auto shrink-0"
@@ -509,6 +519,13 @@ export default function HomeClient({
 
       <SiteFooter />
       <WelcomePopup />
+      {selectedConnection?.other_user && (
+        <ViewProfileModal
+          profile={selectedConnection.other_user}
+          isOpen={profileModalOpen}
+          onClose={() => setProfileModalOpen(false)}
+        />
+      )}
     </div>
   )
 }
