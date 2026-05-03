@@ -304,6 +304,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 text-sm select-none">@</span>
                   <input
                     type="text"
+                    aria-label="New username"
                     value={usernameDraft}
                     onChange={(e) => { setUsernameDraft(e.target.value); if (usernameError) setUsernameError('') }}
                     placeholder="Johnny_depp"
@@ -373,6 +374,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
               <div className="flex flex-col gap-2">
                 <input
                   type="text"
+                  aria-label="Region"
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
                   placeholder="e.g. Bangalore, India"

@@ -260,8 +260,9 @@ export default function ContactClient() {
                 {/* Name + Email row */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-white/50 text-xs font-medium">Name</label>
+                    <label htmlFor="contact-name" className="text-white/50 text-xs font-medium">Name</label>
                     <input
+                      id="contact-name"
                       type="text"
                       placeholder="Your name"
                       {...field('name')}
@@ -271,8 +272,9 @@ export default function ContactClient() {
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-white/50 text-xs font-medium">Email</label>
+                    <label htmlFor="contact-email" className="text-white/50 text-xs font-medium">Email</label>
                     <input
+                      id="contact-email"
                       type="email"
                       placeholder="you@email.com"
                       {...field('email')}
@@ -284,9 +286,10 @@ export default function ContactClient() {
 
                 {/* Subject */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-white/50 text-xs font-medium">Subject</label>
+                  <label htmlFor="contact-subject" className="text-white/50 text-xs font-medium">Subject</label>
                   <div className="relative">
                     <select
+                      id="contact-subject"
                       {...field('subject')}
                       className="w-full bg-black border border-white/10 rounded-lg px-3 py-2.5 text-white text-sm outline-none focus:border-orange-500/50 transition-colors appearance-none cursor-pointer pr-8"
                     >
@@ -294,7 +297,7 @@ export default function ContactClient() {
                         <option key={s} value={s} className="bg-zinc-900">{s}</option>
                       ))}
                     </select>
-                    <svg className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg aria-hidden="true" className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <polyline points="6 9 12 15 18 9"/>
                     </svg>
                   </div>
@@ -302,8 +305,9 @@ export default function ContactClient() {
 
                 {/* Message */}
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-white/50 text-xs font-medium">Message</label>
+                  <label htmlFor="contact-message" className="text-white/50 text-xs font-medium">Message</label>
                   <textarea
+                    id="contact-message"
                     rows={6}
                     placeholder="Describe your issue or idea in detail..."
                     {...field('message')}
