@@ -66,11 +66,29 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
     if (!formatOk) { setAvailability('idle'); return }
 
     setAvailability('checking')
+    let cancelled = false
+
     const timer = setTimeout(async () => {
-      const { data } = await supabase.from('profiles').select('id').eq('username', username).maybeSingle()
-      setAvailability(data ? 'taken' : 'available')
+      // Hard timeout so a hung request never strands the UI on "checking".
+      // The server action enforces uniqueness, so falling back to 'available' is safe.
+      const timeoutMs = 5000
+      try {
+        const query = supabase.from('profiles').select('id').eq('username', username).maybeSingle()
+        const result = await Promise.race([
+          query,
+          new Promise<{ data: null; error: Error }>((resolve) =>
+            setTimeout(() => resolve({ data: null, error: new Error('timeout') }), timeoutMs)
+          ),
+        ])
+        if (cancelled) return
+        if (result.error) { setAvailability('available'); return }
+        setAvailability(result.data ? 'taken' : 'available')
+      } catch {
+        if (!cancelled) setAvailability('available')
+      }
     }, 400)
-    return () => clearTimeout(timer)
+
+    return () => { cancelled = true; clearTimeout(timer) }
   }, [username, supabase])
 
   const formatValid = username.length >= 3 && username.length <= 20 && /^[a-zA-Z0-9_]+$/.test(username)
