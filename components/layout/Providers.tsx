@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActiveChatProvider } from '@/context/ActiveChatContext'
-import LazyRealtime from '@/components/layout/LazyRealtime'
+import { RealtimeProvider } from '@/providers/RealtimeProvider'
 import { ToasterProvider } from '@/components/ui/Toaster'
 import OfflineOverlay from '@/components/layout/OfflineOverlay'
 
@@ -52,9 +52,9 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <ToasterProvider>
-      <LazyRealtime userId={userId}>
+      <RealtimeProvider userId={userId}>
         <ActiveChatProvider>{children}</ActiveChatProvider>
-      </LazyRealtime>
+      </RealtimeProvider>
       <OfflineOverlay />
     </ToasterProvider>
   )

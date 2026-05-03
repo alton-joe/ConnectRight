@@ -206,7 +206,6 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
                   <div className="relative">
                     <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/25 text-sm select-none">@</span>
                     <input
-                      aria-label="Username"
                       className={`w-full bg-white/5 border rounded-xl pl-8 pr-12 py-2.5 text-white placeholder:text-white/25 text-sm outline-none transition-colors ${
                         usernameError || availability === 'taken'
                           ? 'border-red-500/60 focus:border-red-500'

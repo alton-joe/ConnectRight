@@ -533,7 +533,6 @@ export default function HomeClient({
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setConnectedFilter('all')}
-                    aria-pressed={connectedFilter === 'all'}
                     className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
                       connectedFilter === 'all'
                         ? 'bg-white text-black'
@@ -544,7 +543,6 @@ export default function HomeClient({
                   </button>
                   <button
                     onClick={() => setConnectedFilter('unread')}
-                    aria-pressed={connectedFilter === 'unread'}
                     className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
                       connectedFilter === 'unread'
                         ? 'bg-white text-black'
