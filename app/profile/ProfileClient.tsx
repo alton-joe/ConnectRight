@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import BackButton from '@/components/layout/BackButton'
 import UserAvatar from '@/components/ui/UserAvatar'
+import { useToast } from '@/components/ui/Toaster'
 import type { Profile } from '@/types'
 import { formatDate } from '@/utils/helpers'
 import { ANIMALS } from '@/lib/avatars'
@@ -16,6 +17,7 @@ interface ProfileClientProps {
 }
 
 export default function ProfileClient({ profile }: ProfileClientProps) {
+  const { showToast } = useToast()
   const [signingOut, setSigningOut] = useState(false)
   const [region, setRegion] = useState(profile.region ?? '')
   const [editingRegion, setEditingRegion] = useState(false)
@@ -52,7 +54,9 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
     if (error) {
       setRegionError('Failed to save. Try again.')
     } else {
+      const wasEmpty = !profile.region
       setEditingRegion(false)
+      showToast(wasEmpty ? 'Region added' : 'Region updated', 'success')
     }
   }
 
@@ -73,6 +77,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
     if (!error) {
       setAvatarUrl(id)
       setPickingAvatar(false)
+      showToast('Avatar updated', 'success')
     }
   }
 

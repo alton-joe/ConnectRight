@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ActiveChatProvider } from '@/context/ActiveChatContext'
 import { RealtimeProvider } from '@/providers/RealtimeProvider'
+import { ToasterProvider } from '@/components/ui/Toaster'
+import OfflineOverlay from '@/components/layout/OfflineOverlay'
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const supabase = useMemo(() => createClient(), [])
@@ -49,8 +51,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   }, [supabase])
 
   return (
-    <RealtimeProvider userId={userId}>
-      <ActiveChatProvider>{children}</ActiveChatProvider>
-    </RealtimeProvider>
+    <ToasterProvider>
+      <RealtimeProvider userId={userId}>
+        <ActiveChatProvider>{children}</ActiveChatProvider>
+      </RealtimeProvider>
+      <OfflineOverlay />
+    </ToasterProvider>
   )
 }

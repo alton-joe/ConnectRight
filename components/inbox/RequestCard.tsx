@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Button from '@/components/ui/Button'
 import UserAvatar from '@/components/ui/UserAvatar'
+import { useToast } from '@/components/ui/Toaster'
 import ViewProfileModal from '@/components/users/ViewProfileModal'
 import type { ConnectionRequest } from '@/types'
 import { getInitial } from '@/utils/helpers'
@@ -18,6 +19,7 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
   const [error, setError] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const supabase = useMemo(() => createClient(), [])
+  const { showToast } = useToast()
 
   const handleAccept = async () => {
     setLoading('accept')
@@ -34,6 +36,7 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
         setError(rpcError.message || 'Failed to accept. Try again.')
         return
       }
+      showToast(`You are now connected with @${request.sender?.username ?? 'them'}`, 'success')
       onRemove(request.id)
     } catch (err) {
       console.error('accept_connection_request threw:', err)

@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { useToast } from '@/components/ui/Toaster'
 import type { Connection, ConnectionRequest, Profile } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -55,16 +56,27 @@ interface RealtimeProviderProps {
 
 export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
   const supabase = useMemo(() => createClient(), [])
+  const { showToast } = useToast()
   const [inboxRequests, setInboxRequests] = useState<ConnectionRequest[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
   const [inboxLoading, setInboxLoading] = useState(false)
   const [connectionsLoading, setConnectionsLoading] = useState(false)
 
   const mountedRef = useRef(true)
+  // Track which inbox request IDs we've already surfaced to avoid re-toasting
+  // on every poll/refetch. Initialized lazily on first fetch so the user
+  // doesn't get spammed with toasts for requests that were pending before
+  // they loaded the page.
+  const seenInboxIdsRef = useRef<Set<string> | null>(null)
+  // Dedupe "your request was accepted" toasts — a single accept can produce
+  // multiple UPDATE events as RLS / triggers settle.
+  const notifiedAcceptedIdsRef = useRef<Set<string>>(new Set())
   const inboxChannelRef = useRef<RealtimeChannel | null>(null)
   const connectionsChannelRef = useRef<RealtimeChannel | null>(null)
+  const outgoingChannelRef = useRef<RealtimeChannel | null>(null)
   const inboxRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const connectionsRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const outgoingRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inboxPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const connectionsPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const reconnectingRef = useRef(false)
@@ -98,13 +110,34 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
         ),
       ])
       if (seq !== inboxSeqRef.current || !mountedRef.current) return
-      setInboxRequests((data as ConnectionRequest[]) ?? [])
+      const next = (data as ConnectionRequest[]) ?? []
+      if (seenInboxIdsRef.current === null) {
+        // First fetch — establish baseline without toasting existing requests.
+        seenInboxIdsRef.current = new Set(next.map((r) => r.id))
+      } else {
+        const seen = seenInboxIdsRef.current
+        for (const req of next) {
+          if (!seen.has(req.id)) {
+            seen.add(req.id)
+            const name = req.sender?.username
+            showToast(
+              name ? `@${name} sent you a connection request` : 'New connection request',
+              'info'
+            )
+          }
+        }
+        // Drop ids that no longer exist (declined/accepted) so re-pending
+        // (rare but possible via the RPC) re-toasts.
+        const nextIdSet = new Set(next.map((r) => r.id))
+        seen.forEach((id) => { if (!nextIdSet.has(id)) seen.delete(id) })
+      }
+      setInboxRequests(next)
     } catch {
       // Timeout or network error — keep existing state
     } finally {
       if (seq === inboxSeqRef.current && mountedRef.current) setInboxLoading(false)
     }
-  }, [userId, supabase])
+  }, [userId, supabase, showToast])
 
   const fetchConnections = useCallback(async () => {
     if (!userId) {
@@ -160,6 +193,10 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
 
   useEffect(() => {
     mountedRef.current = true
+    // Reset toast baseline so a fresh login establishes its own; otherwise
+    // requests pending for the new user could spam toasts.
+    seenInboxIdsRef.current = null
+    notifiedAcceptedIdsRef.current = new Set()
     if (!userId) {
       setInboxRequests([])
       setConnections([])
@@ -253,10 +290,56 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
       connectionsChannelRef.current = ch
     }
 
+    const createOutgoingAcceptedChannel = () => {
+      if (!mountedRef.current) return
+      if (outgoingRetryRef.current) {
+        clearTimeout(outgoingRetryRef.current)
+        outgoingRetryRef.current = null
+      }
+      if (outgoingChannelRef.current) {
+        supabase.removeChannel(outgoingChannelRef.current)
+        outgoingChannelRef.current = null
+      }
+      // Listen for the receiver flipping our outgoing request to 'accepted',
+      // then fetch the receiver's username for the toast copy.
+      const ch = supabase
+        .channel(`realtime-outgoing-${userId}-${instanceId}`)
+        .on(
+          'postgres_changes',
+          { event: 'UPDATE', schema: 'public', table: 'connection_requests', filter: `sender_id=eq.${userId}` },
+          async (payload) => {
+            const row = payload.new as { id: string; status: string; receiver_id: string }
+            if (row.status !== 'accepted') return
+            if (notifiedAcceptedIdsRef.current.has(row.id)) return
+            notifiedAcceptedIdsRef.current.add(row.id)
+            const { data: receiver } = await supabase
+              .from('profiles')
+              .select('username')
+              .eq('id', row.receiver_id)
+              .maybeSingle()
+            if (!mountedRef.current) return
+            const name = receiver?.username
+            showToast(
+              name ? `@${name} accepted your connection request` : 'Your connection request was accepted',
+              'success'
+            )
+          }
+        )
+        .subscribe((status) => {
+          if ((status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') && mountedRef.current) {
+            supabase.removeChannel(ch)
+            outgoingChannelRef.current = null
+            outgoingRetryRef.current = setTimeout(createOutgoingAcceptedChannel, 2000)
+          }
+        })
+      outgoingChannelRef.current = ch
+    }
+
     fetchInbox()
     fetchConnections()
     createInboxChannel()
     createConnectionsChannel()
+    createOutgoingAcceptedChannel()
 
     inboxPollRef.current = setInterval(() => {
       if (mountedRef.current) fetchInbox()
@@ -281,6 +364,11 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
         console.warn('[RealtimeProvider] connections channel state =', connCh.state, '— recreating')
         createConnectionsChannel()
       }
+      const outCh = outgoingChannelRef.current
+      if (outCh && (outCh.state === 'closed' || outCh.state === 'errored')) {
+        console.warn('[RealtimeProvider] outgoing channel state =', outCh.state, '— recreating')
+        createOutgoingAcceptedChannel()
+      }
     }, 15_000)
 
     // No manual refreshSession() timer — supabase-js auto-refreshes the JWT
@@ -295,6 +383,7 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
         fetchConnections()
         createInboxChannel()
         createConnectionsChannel()
+        createOutgoingAcceptedChannel()
       } finally {
         reconnectingRef.current = false
       }
@@ -329,6 +418,10 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
         clearTimeout(connectionsRetryRef.current)
         connectionsRetryRef.current = null
       }
+      if (outgoingRetryRef.current) {
+        clearTimeout(outgoingRetryRef.current)
+        outgoingRetryRef.current = null
+      }
       if (inboxChannelRef.current) {
         supabase.removeChannel(inboxChannelRef.current)
         inboxChannelRef.current = null
@@ -337,8 +430,12 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
         supabase.removeChannel(connectionsChannelRef.current)
         connectionsChannelRef.current = null
       }
+      if (outgoingChannelRef.current) {
+        supabase.removeChannel(outgoingChannelRef.current)
+        outgoingChannelRef.current = null
+      }
     }
-  }, [userId, supabase, instanceId, fetchInbox, fetchConnections])
+  }, [userId, supabase, instanceId, fetchInbox, fetchConnections, showToast])
 
   const value = useMemo<RealtimeContextValue>(
     () => ({

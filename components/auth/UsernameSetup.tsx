@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProfile } from '@/app/setup/actions'
 import { createClient } from '@/lib/supabase/client'
-import { ANIMALS } from '@/lib/avatars'
+import { queueToast } from '@/components/ui/Toaster'
+import { ANIMALS, getAnimal } from '@/lib/avatars'
 import type { AnimalId } from '@/lib/avatars'
 
 interface UsernameSetupProps {
@@ -111,6 +112,9 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
       const result = await createProfile(username.trim(), selectedAvatar)
       if (result.error) { setUsernameError(result.error); setStep(1); setLoading(false); return }
       localStorage.setItem('connectright_show_welcome', 'true')
+      queueToast(`Username @${username.trim()} set successfully`, 'success')
+      const animalName = getAnimal(selectedAvatar)?.name
+      queueToast(animalName ? `Avatar set to ${animalName}` : 'Avatar set successfully', 'success')
       router.push('/home')
     } catch {
       setUsernameError('Something went wrong. Please try again.')
