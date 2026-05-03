@@ -406,7 +406,7 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
 
         <p className="text-center text-white/60 text-xs mt-4">
           {step === 1
-            ? 'Username once chosen cannot be changed.'
+            ? <>Username again can be modified only <span className="text-white font-semibold">once</span> after sign up.</>
             : step === 2
             ? 'Pick the things you genuinely enjoy — others will see these.'
             : 'You can update your avatar from your profile anytime.'}
