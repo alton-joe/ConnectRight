@@ -89,11 +89,20 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
       // ignore parse / storage errors
     }
 
-    // Server-side OAuth callback drops a `cr_just_verified=1` cookie that we
-    // surface here, then immediately delete so the toast doesn't repeat.
-    if (document.cookie.split('; ').some((c) => c.startsWith('cr_just_verified='))) {
+    // Server-side OAuth callback drops a `cr_just_verified=<kind>` cookie that
+    // we surface here, then immediately delete so the toast doesn't repeat.
+    // <kind> is 'signup' for fresh users and 'login' for returning ones.
+    const flag = document.cookie
+      .split('; ')
+      .find((c) => c.startsWith('cr_just_verified='))
+    if (flag) {
+      const kind = flag.split('=')[1]
       document.cookie = 'cr_just_verified=; path=/; max-age=0'
-      showToast('Mail ID verified successfully', 'success')
+      if (kind === 'signup') {
+        showToast('Signed up successfully', 'success')
+      } else {
+        showToast('Logged in successfully', 'success')
+      }
     }
   }, [showToast])
 

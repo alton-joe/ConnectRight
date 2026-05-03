@@ -16,6 +16,7 @@ import { useActiveChat } from '@/context/ActiveChatContext'
 import { useTypingForConnections } from '@/hooks/useTypingForConnections'
 import type { Profile, Message } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
+import { INTERESTS, MAX_INTERESTS, getInterest } from '@/lib/interests'
 
 interface LastMessageInfo {
   created_at: string
@@ -28,6 +29,7 @@ interface HomeClientProps {
   initialProfiles: Profile[]
   initialPendingCount: number
   initialChatId: string | null
+  initialFullscreen: boolean
 }
 
 export default function HomeClient({
@@ -35,15 +37,19 @@ export default function HomeClient({
   initialProfiles,
   initialPendingCount: _initialPendingCount,
   initialChatId,
+  initialFullscreen,
 }: HomeClientProps) {
   const router = useRouter()
   const { connections } = useRealtime()
   const { users: allOtherProfiles } = useAvailableUsers(currentUserId, initialProfiles)
   const { setActiveChatConnectionId } = useActiveChat()
   const [chatPanelOpen, setChatPanelOpen] = useState(false)
-  const [fullscreenChat, setFullscreenChat] = useState(false)
+  const [fullscreenChat, setFullscreenChat] = useState(initialFullscreen && !!initialChatId)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [connectedFilter, setConnectedFilter] = useState<'all' | 'unread'>('all')
+  const [interestFilter, setInterestFilter] = useState<string[]>([])
+  const [interestFilterOpen, setInterestFilterOpen] = useState(false)
+  const interestFilterRef = useRef<HTMLDivElement>(null)
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
   const [lastMessageInfo, setLastMessageInfo] = useState<Record<string, LastMessageInfo>>({})
@@ -65,7 +71,8 @@ export default function HomeClient({
     setSelectedConnectionId(id)
     setChatPanelOpen(true)
     setActiveChatConnectionId(id)
-    router.replace(`/home?chat=${id}`, { scroll: false })
+    const fsSuffix = fullscreenChat ? '&fs=1' : ''
+    router.replace(`/home?chat=${id}${fsSuffix}`, { scroll: false })
   }
 
   const closeChat = () => {
@@ -78,6 +85,17 @@ export default function HomeClient({
       setSelectedConnectionId(null)
       closeTimerRef.current = null
     }, 380)
+  }
+
+  const toggleFullscreen = () => {
+    setFullscreenChat((prev) => {
+      const next = !prev
+      if (selectedConnectionId) {
+        const fsSuffix = next ? '&fs=1' : ''
+        router.replace(`/home?chat=${selectedConnectionId}${fsSuffix}`, { scroll: false })
+      }
+      return next
+    })
   }
 
   // Restore chat panel from URL on load (once connections are available)
@@ -291,9 +309,33 @@ export default function HomeClient({
   )
 
   const availableProfiles = useMemo(
-    () => allOtherProfiles.filter((p) => !connectedIds.has(p.id)),
-    [allOtherProfiles, connectedIds]
+    () => {
+      const base = allOtherProfiles.filter((p) => !connectedIds.has(p.id))
+      if (interestFilter.length === 0) return base
+      // OR semantics — any matching interest qualifies the profile.
+      return base.filter((p) => p.interests?.some((id) => interestFilter.includes(id)))
+    },
+    [allOtherProfiles, connectedIds, interestFilter]
   )
+
+  useEffect(() => {
+    if (!interestFilterOpen) return
+    const onDocClick = (e: MouseEvent) => {
+      if (interestFilterRef.current && !interestFilterRef.current.contains(e.target as Node)) {
+        setInterestFilterOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [interestFilterOpen])
+
+  const toggleInterestFilter = (id: string) => {
+    setInterestFilter((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id)
+      if (prev.length >= MAX_INTERESTS) return prev
+      return [...prev, id]
+    })
+  }
 
   const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
 
@@ -314,7 +356,103 @@ export default function HomeClient({
 
           {/* LEFT — Available Users */}
           <section className="bg-zinc-900 border border-white/10 rounded-2xl p-5 flex flex-col gap-4 overflow-hidden">
-            <h2 className="text-white font-semibold text-base shrink-0">Available Users</h2>
+            <div className="flex items-center justify-between gap-2 shrink-0">
+              <h2 className="text-white font-semibold text-base">Available Users</h2>
+              <div className="flex items-center gap-2">
+                <div className="relative" ref={interestFilterRef}>
+                  <button
+                    onClick={() => setInterestFilterOpen((v) => !v)}
+                    className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 cursor-pointer transition-colors ${
+                      interestFilter.length > 0
+                        ? 'bg-white/10 text-white border border-white/30'
+                        : 'bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white'
+                    }`}
+                    aria-label="Filter by interests"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+                    </svg>
+                    Filter
+                    {interestFilter.length > 0 && (
+                      <span className="bg-white text-black text-[10px] font-bold rounded-full px-1.5 py-0 leading-tight">
+                        {interestFilter.length}
+                      </span>
+                    )}
+                  </button>
+                  {interestFilterOpen && (
+                    <div className="absolute right-0 top-full mt-2 z-30 w-72 bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-white/60 text-xs">Filter by interest <span className="text-white/30">(max 5)</span></p>
+                        <span className={`text-[11px] tabular-nums ${interestFilter.length >= MAX_INTERESTS ? 'text-white' : 'text-white/40'}`}>
+                          {interestFilter.length}/{MAX_INTERESTS}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-60 overflow-y-auto">
+                        {INTERESTS.map((it) => {
+                          const selected = interestFilter.includes(it.id)
+                          const atLimit = interestFilter.length >= MAX_INTERESTS && !selected
+                          return (
+                            <button
+                              key={it.id}
+                              onClick={() => toggleInterestFilter(it.id)}
+                              disabled={atLimit}
+                              className={`inline-flex items-center gap-1.5 text-xs rounded-full px-2.5 py-1 border transition-colors ${
+                                selected
+                                  ? 'border-white bg-white/10 text-white cursor-pointer'
+                                  : atLimit
+                                  ? 'border-white/5 bg-white/3 text-white/25 cursor-not-allowed'
+                                  : 'border-white/10 bg-white/5 text-white/60 hover:border-white/20 hover:text-white cursor-pointer'
+                              }`}
+                            >
+                              <span className="shrink-0">{it.icon}</span>
+                              {it.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                {interestFilter.length > 0 && (
+                  <button
+                    onClick={() => setInterestFilter([])}
+                    aria-label="Clear filters"
+                    className="group relative p-1.5 rounded-full bg-white/5 text-white/60 border border-white/10 hover:bg-white/10 hover:text-white cursor-pointer transition-colors"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="23 4 23 10 17 10"/>
+                      <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+                    </svg>
+                    <span className="pointer-events-none absolute right-0 top-full mt-1.5 whitespace-nowrap text-[11px] bg-zinc-950 border border-white/10 text-white/80 rounded px-2 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      Clear
+                    </span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {interestFilter.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 shrink-0">
+                {interestFilter.map((id) => {
+                  const it = getInterest(id)
+                  if (!it) return null
+                  return (
+                    <button
+                      key={id}
+                      onClick={() => toggleInterestFilter(id)}
+                      className="inline-flex items-center gap-1 text-[11px] rounded-full px-2 py-0.5 border border-white/20 bg-white/5 text-white/80 hover:bg-white/10 hover:text-white cursor-pointer transition-colors"
+                    >
+                      {it.label}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
             {availableProfiles.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
@@ -323,8 +461,22 @@ export default function HomeClient({
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                <p className="text-white/30 text-sm">No other users yet.</p>
-                <p className="text-white/20 text-xs">Invite someone to join!</p>
+                {interestFilter.length > 0 ? (
+                  <>
+                    <p className="text-white/30 text-sm">No users match these interests.</p>
+                    <button
+                      onClick={() => setInterestFilter([])}
+                      className="text-white/80 hover:text-white text-xs cursor-pointer transition-colors underline"
+                    >
+                      Clear filters
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-white/30 text-sm">No other users yet.</p>
+                    <p className="text-white/20 text-xs">Invite someone to join!</p>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flex-1 flex flex-col gap-3 overflow-y-auto">
@@ -480,7 +632,7 @@ export default function HomeClient({
                       </div>
                     </button>
                     <button
-                      onClick={() => setFullscreenChat(f => !f)}
+                      onClick={toggleFullscreen}
                       className="text-white/40 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5 ml-auto shrink-0"
                       aria-label={fullscreenChat ? 'Exit fullscreen' : 'Fullscreen chat'}
                     >

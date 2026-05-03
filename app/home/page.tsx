@@ -5,14 +5,14 @@ import HomeClient from './HomeClient'
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ chat?: string }>
+  searchParams: Promise<{ chat?: string; fs?: string }>
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
   if (!user) redirect('/')
 
-  const { chat: initialChatId } = await searchParams
+  const { chat: initialChatId, fs: initialFullscreen } = await searchParams
 
   // Fetch all profiles except current user
   const { data: profiles } = await supabase
@@ -34,6 +34,7 @@ export default async function HomePage({
       initialProfiles={profiles ?? []}
       initialPendingCount={pendingCount ?? 0}
       initialChatId={initialChatId ?? null}
+      initialFullscreen={initialFullscreen === '1'}
     />
   )
 }

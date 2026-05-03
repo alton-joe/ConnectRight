@@ -4,7 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 
 export async function createProfile(
   username: string,
-  avatarId?: string
+  avatarId?: string,
+  interests?: string[]
 ): Promise<{ error?: string }> {
   if (!username || username.length < 3 || username.length > 20) {
     return { error: 'Username must be 3–20 characters.' }
@@ -32,6 +33,7 @@ export async function createProfile(
     username,
     email: user.email ?? '',
     avatar_url: avatarId ?? user.user_metadata?.avatar_url ?? null,
+    interests: interests && interests.length > 0 ? interests : null,
   })
 
   if (insertError) {

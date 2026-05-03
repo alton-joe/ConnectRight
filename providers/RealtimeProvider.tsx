@@ -99,7 +99,7 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
           .select(`
             *,
             sender:profiles!connection_requests_sender_id_fkey(
-              id, username, email, avatar_url, region, last_active, created_at
+              id, username, email, avatar_url, region, interests, last_active, created_at
             )
           `)
           .eq('receiver_id', userId)
@@ -156,8 +156,8 @@ export function RealtimeProvider({ userId, children }: RealtimeProviderProps) {
             user_a,
             user_b,
             created_at,
-            profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, region, last_active, created_at),
-            profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, region, last_active, created_at)
+            profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, region, interests, last_active, created_at),
+            profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, region, interests, last_active, created_at)
           `)
           .or(`user_a.eq.${userId},user_b.eq.${userId}`),
         new Promise<never>((_, reject) =>

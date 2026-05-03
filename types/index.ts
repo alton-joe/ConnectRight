@@ -4,6 +4,7 @@ export interface Profile {
   email: string
   avatar_url: string | null
   region: string | null
+  interests: string[] | null
   last_active: string
   created_at: string
 }

@@ -11,6 +11,11 @@ const slides = [
       'ConnectRight is a platform to find the right match of people. Browse users, send connection requests, and build your network.',
   },
   {
+    title: 'Filter by Interests',
+    description:
+      'Find people who actually share what you love — filter by interests like gaming, music, fitness, coding, and more, then connect with the ones that fit.',
+  },
+  {
     title: 'Chat in Real Time',
     description:
       'Once someone accepts your connection request, open a live chat and start messaging instantly — no delays, no refresh needed.',

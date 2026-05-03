@@ -8,13 +8,14 @@ import { useAuth } from '@/hooks/useAuth'
 import { useActiveChat } from '@/context/ActiveChatContext'
 import { useRealtime } from '@/providers/RealtimeProvider'
 import InboxPanel from '@/components/inbox/InboxPanel'
+import UserAvatar from '@/components/ui/UserAvatar'
 import { formatTime } from '@/utils/helpers'
 import type { Message, ChatNotification } from '@/types'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
 const NAV_LINKS = [
   { label: 'Home', href: '/home' },
-  { label: 'Connect', href: '/home' },
+  { label: 'Activity', href: '/activity' },
   { label: 'About', href: '/about' },
   { label: 'Contact', href: '/contact' },
 ]
@@ -66,7 +67,7 @@ function TypewriterWord() {
 
 export default function GlobalHeader() {
   const pathname = usePathname()
-  const { user, loading: authLoading } = useAuth()
+  const { user, profile, loading: authLoading } = useAuth()
   const { activeChatConnectionId } = useActiveChat()
   const [inboxOpen, setInboxOpen] = useState(false)
   const [signingIn, setSigningIn] = useState(false)
@@ -91,6 +92,7 @@ export default function GlobalHeader() {
   const activeChatRef = useRef<string | null>(null)
   const notifChannelRef = useRef<RealtimeChannel | null>(null)
   const notifRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const seededUnreadRef = useRef(false)
 
   const supabase = useMemo(() => createClient(), [])
   const instanceId = useMemo(() => Math.random().toString(36).slice(2, 9), [])
@@ -120,6 +122,52 @@ export default function GlobalHeader() {
       setChatNotifications((prev) => prev.filter((n) => n.connectionId !== activeChatConnectionId))
     }
   }, [activeChatConnectionId])
+
+  // Seed the panel with existing unread inbound messages on first mount —
+  // realtime INSERTs cover messages that arrive after the listener is attached,
+  // but anything received before the page loaded is otherwise invisible here.
+  useEffect(() => {
+    if (!user || !connectionsMap || connectionsMap.size === 0) return
+    if (seededUnreadRef.current) return
+    seededUnreadRef.current = true
+    let cancelled = false
+    ;(async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('id, connection_id, sender_id, content, created_at')
+        .neq('sender_id', user.id)
+        .is('read_at', null)
+        .in('connection_id', Array.from(connectionsMap.keys()))
+        .order('created_at', { ascending: false })
+        .limit(20)
+      if (cancelled || !data) return
+      const seeded: ChatNotification[] = []
+      for (const m of data as Message[]) {
+        if (m.connection_id === activeChatRef.current) continue
+        const other = connectionsMap.get(m.connection_id)
+        if (!other) continue
+        seeded.push({
+          id: m.id,
+          connectionId: m.connection_id,
+          senderUsername: other.username,
+          senderAvatarUrl: other.avatarUrl,
+          content: m.content,
+          created_at: m.created_at,
+        })
+      }
+      if (seeded.length > 0) {
+        setChatNotifications((prev) => {
+          const existing = new Set(prev.map((n) => n.id))
+          const merged = [...prev]
+          for (const n of seeded) if (!existing.has(n.id)) merged.push(n)
+          return merged
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 20)
+        })
+      }
+    })()
+    return () => { cancelled = true }
+  }, [user, connectionsMap, supabase])
 
   // Subscribe to all new messages and surface them as notifications when appropriate.
   // Includes reconnect logic so the channel recovers after network errors.
@@ -261,7 +309,7 @@ export default function GlobalHeader() {
             <button
               onClick={handleSignUp}
               disabled={signingIn}
-              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-4 py-2 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-60 cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-4 py-2 rounded-xl hover:bg-gray-50 hover:scale-[1.05] hover:shadow-lg active:scale-[0.98] transition-all duration-200 ease-out disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
             >
               {signingIn ? 'Redirecting...' : 'Sign Up'}
             </button>
@@ -353,13 +401,17 @@ export default function GlobalHeader() {
 
               <Link
                 href="/profile"
-                className="p-2 rounded-lg text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+                className="flex items-center gap-2 pl-1 pr-3 py-1 ml-1 text-white/80 hover:text-white transition-colors"
                 aria-label="View profile"
               >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
+                <UserAvatar
+                  username={profile?.username ?? user.email ?? '?'}
+                  avatarUrl={profile?.avatar_url ?? null}
+                  size={28}
+                />
+                {profile?.username && (
+                  <span className="text-sm font-medium max-w-[140px] truncate">{profile.username}</span>
+                )}
               </Link>
             </>
           )}

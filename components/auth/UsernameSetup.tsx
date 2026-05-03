@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { createProfile } from '@/app/setup/actions'
 import { createClient } from '@/lib/supabase/client'
-import { queueToast } from '@/components/ui/Toaster'
-import { ANIMALS, getAnimal } from '@/lib/avatars'
+import { useToast } from '@/components/ui/Toaster'
+import { ANIMALS } from '@/lib/avatars'
 import type { AnimalId } from '@/lib/avatars'
+import { INTERESTS, MAX_INTERESTS } from '@/lib/interests'
 
 interface UsernameSetupProps {
   userId: string
@@ -50,14 +51,29 @@ function FakeCard({ initial, name, tag, online }: { initial: string; name: strin
 
 export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avatarUrl }: UsernameSetupProps) {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2>(1)
+  const { showToast } = useToast()
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [sliding, setSliding] = useState(false)
 
   const [username, setUsername] = useState('')
   const [usernameError, setUsernameError] = useState('')
   const [loading, setLoading] = useState(false)
   const [availability, setAvailability] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([])
   const [selectedAvatar, setSelectedAvatar] = useState<AnimalId | null>(null)
+
+  const goToStep = (next: 1 | 2 | 3) => {
+    setSliding(true)
+    setTimeout(() => { setStep(next); setSliding(false) }, 280)
+  }
+
+  const toggleInterest = (id: string) => {
+    setSelectedInterests((prev) => {
+      if (prev.includes(id)) return prev.filter((x) => x !== id)
+      if (prev.length >= MAX_INTERESTS) return prev
+      return [...prev, id]
+    })
+  }
 
   const supabase = useMemo(() => createClient(), [])
 
@@ -95,12 +111,19 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
   const formatValid = username.length >= 3 && username.length <= 20 && /^[a-zA-Z0-9_]+$/.test(username)
   const canProceed = formatValid && availability === 'available'
 
-  // Step 1 → Step 2 with slide
+  // Step 1 → Step 2 (interests) with slide
   const handleContinue = (e: React.FormEvent) => {
     e.preventDefault()
     if (!canProceed) return
-    setSliding(true)
-    setTimeout(() => { setStep(2); setSliding(false) }, 280)
+    showToast(`Username @${username.trim()} selected`, 'success')
+    goToStep(2)
+  }
+
+  // Step 2 → Step 3 (avatar) with slide
+  const handleInterestsContinue = () => {
+    if (selectedInterests.length < 1) return
+    showToast(`${selectedInterests.length} interest${selectedInterests.length > 1 ? 's' : ''} selected`, 'success')
+    goToStep(3)
   }
 
   // Final submit
@@ -109,12 +132,9 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
     setLoading(true)
 
     try {
-      const result = await createProfile(username.trim(), selectedAvatar)
+      const result = await createProfile(username.trim(), selectedAvatar, selectedInterests)
       if (result.error) { setUsernameError(result.error); setStep(1); setLoading(false); return }
       localStorage.setItem('connectright_show_welcome', 'true')
-      queueToast(`Username @${username.trim()} set successfully`, 'success')
-      const animalName = getAnimal(selectedAvatar)?.name
-      queueToast(animalName ? `Avatar set to ${animalName}` : 'Avatar set successfully', 'success')
       router.push('/home')
     } catch {
       setUsernameError('Something went wrong. Please try again.')
@@ -157,7 +177,7 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
       {/* ── Card ── */}
       <div
         className="relative z-10 w-full transition-all duration-300 ease-in-out"
-        style={{ maxWidth: step === 2 ? '480px' : '384px' }}
+        style={{ maxWidth: step === 1 ? '384px' : '480px' }}
       >
         {/* Logo */}
         <div className="text-center mb-6">
@@ -193,7 +213,7 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
                           ? 'border-green-500/40 focus:border-green-500/60'
                           : 'border-white/10 focus:border-white/30'
                       }`}
-                      placeholder="your_username"
+                      placeholder="eg: Johnny_depp"
                       value={username}
                       onChange={(e) => { setUsername(e.target.value); if (usernameError) setUsernameError('') }}
                       maxLength={20}
@@ -260,13 +280,71 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
             </div>
           )}
 
-          {/* ── STEP 2: Avatar picker ── */}
+          {/* ── STEP 2: Interests ── */}
           {step === 2 && (
             <div className="p-6">
               {/* Header */}
               <div className="flex items-center gap-3 mb-5">
                 <button
-                  onClick={() => { setSliding(true); setTimeout(() => { setStep(1); setSliding(false) }, 280) }}
+                  onClick={() => goToStep(1)}
+                  className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                  aria-label="Go back"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                </button>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-white font-bold text-base leading-none">What describes you the most?</h2>
+                  <p className="text-white/35 text-xs mt-1">Pick at least one, <span className="text-orange-400">@{username}</span></p>
+                </div>
+                <span className={`text-xs tabular-nums shrink-0 ${selectedInterests.length >= MAX_INTERESTS ? 'text-orange-400' : 'text-white/40'}`}>
+                  {selectedInterests.length}/{MAX_INTERESTS}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2.5">
+                {INTERESTS.map((it) => {
+                  const selected = selectedInterests.includes(it.id)
+                  const atLimit = selectedInterests.length >= MAX_INTERESTS && !selected
+                  return (
+                    <button
+                      key={it.id}
+                      type="button"
+                      onClick={() => toggleInterest(it.id)}
+                      disabled={atLimit}
+                      className={`flex flex-col items-center justify-center gap-1.5 px-2 py-3 rounded-xl border transition-all duration-150 ${
+                        selected
+                          ? 'border-orange-500 bg-orange-500/10 text-orange-400'
+                          : atLimit
+                          ? 'border-white/8 bg-white/3 text-white/25 cursor-not-allowed'
+                          : 'border-white/8 bg-white/3 text-white/55 hover:border-white/20 hover:bg-white/6 hover:text-white/80'
+                      }`}
+                    >
+                      <span className="shrink-0">{it.icon}</span>
+                      <span className="text-[11px] font-medium leading-none text-center">{it.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={handleInterestsContinue}
+                disabled={selectedInterests.length < 1}
+                className="mt-5 w-full bg-white text-black font-semibold text-sm py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Continue
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </button>
+            </div>
+          )}
+
+          {/* ── STEP 3: Avatar picker ── */}
+          {step === 3 && (
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <button
+                  onClick={() => goToStep(2)}
                   className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
                   aria-label="Go back"
                 >
@@ -326,8 +404,12 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
           )}
         </div>
 
-        <p className="text-center text-white/20 text-xs mt-4">
-          {step === 1 ? 'You can change this later from your profile.' : 'You can update your avatar from your profile.'}
+        <p className="text-center text-white/60 text-xs mt-4">
+          {step === 1
+            ? 'Username once chosen cannot be changed.'
+            : step === 2
+            ? 'Pick the things you genuinely enjoy — others will see these.'
+            : 'You can update your avatar from your profile anytime.'}
         </p>
       </div>
     </div>

@@ -4,6 +4,7 @@ import Modal from '@/components/ui/Modal'
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { Profile } from '@/types'
 import { timeAgo } from '@/utils/helpers'
+import { getInterest } from '@/lib/interests'
 
 interface ViewProfileModalProps {
   profile: Profile
@@ -25,16 +26,24 @@ export default function ViewProfileModal({ profile, isOpen, onClose }: ViewProfi
         </div>
 
         <div className="w-full bg-white/5 rounded-lg px-4 py-3 flex flex-col gap-3">
-          {profile.region && (
-            <div className="flex items-center justify-between">
-              <span className="text-white/50 text-sm">Region</span>
-              <span className="text-white/80 text-sm">{profile.region}</span>
+          {profile.interests && profile.interests.length > 0 && (
+            <div className="flex items-start justify-between gap-3">
+              <span className="text-white/50 text-sm shrink-0">Interests</span>
+              <span className="text-white/80 text-sm text-right">
+                {profile.interests.map((id) => getInterest(id)?.label ?? id).join(', ')}
+              </span>
             </div>
           )}
           <div className="flex items-center justify-between">
             <span className="text-white/50 text-sm">Last active</span>
             <span className="text-white/80 text-sm">{timeAgo(profile.last_active)}</span>
           </div>
+          {profile.region && (
+            <div className="flex items-center justify-between">
+              <span className="text-white/50 text-sm">Region</span>
+              <span className="text-white/80 text-sm">{profile.region}</span>
+            </div>
+          )}
         </div>
 
         <button

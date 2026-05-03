@@ -69,9 +69,14 @@ const ConnectedCard = forwardRef<HTMLDivElement, ConnectedCardProps>(function Co
         ) : null}
       </div>
 
-      {/* Right side: unread dot, or Chat button when not selected */}
+      {/* Right side: "new" badge for unread, or Chat button when not selected */}
       {hasUnread ? (
-        <span className="shrink-0 w-2 h-2 rounded-full bg-indigo-400" aria-label="Unread" />
+        <span
+          className="shrink-0 text-[8px] font-bold uppercase tracking-wide bg-indigo-500 text-white rounded-full px-1.5 py-1 leading-none"
+          aria-label="Unread"
+        >
+          new
+        </span>
       ) : !isSelected ? (
         <Button
           variant="ghost"

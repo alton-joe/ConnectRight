@@ -89,7 +89,7 @@ export default function LandingPage() {
               <button
                 onClick={handleSignUp}
                 disabled={loading}
-                className="w-full inline-flex items-center justify-center gap-2 bg-white text-black font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-100 transition-colors text-sm disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 bg-white text-black font-semibold px-4 py-2.5 rounded-xl hover:bg-gray-50 hover:scale-[1.03] hover:shadow-lg active:scale-[0.99] transition-all duration-200 ease-out text-sm disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
               >
                 <GoogleIcon size={16} />
                 {loading ? 'Redirecting...' : 'Sign up with Google'}
