@@ -109,15 +109,23 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ showToast }}>
       {children}
-      <div className="fixed top-20 md:top-28 right-4 z-[100] flex flex-col gap-2 pointer-events-none overflow-hidden pl-4">
+      {/* Toast tray.
+          Mobile: pinned to the very top, horizontally centered. The mobile
+          header keeps the brand on the left and icons on the right with an
+          empty center, so a centered toast at top-2 sits cleanly above all
+          page content (including the setup wizard, which has no header) and
+          doesn't overlap header icons.
+          Desktop: pinned just under the 6rem header on the right edge — that
+          sits below the desktop header so it never overlaps icons. */}
+      <div className="fixed top-2 md:top-[6.5rem] left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-[100] flex flex-col gap-2 pointer-events-none w-[calc(100vw-2rem)] sm:w-auto items-center md:items-end">
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`pointer-events-auto flex items-center gap-2.5 bg-zinc-900/95 backdrop-blur border ${VARIANT_STYLES[t.variant]} rounded-xl shadow-2xl px-4 py-2.5 min-w-[240px] max-w-sm animate-toast-in`}
+            className={`pointer-events-auto flex items-center gap-2.5 bg-zinc-900/95 backdrop-blur border ${VARIANT_STYLES[t.variant]} rounded-xl shadow-2xl px-4 py-2.5 w-auto sm:min-w-[240px] max-w-[calc(100vw-2rem)] sm:max-w-sm animate-toast-in`}
             role="status"
           >
             <span className="shrink-0">{ICONS[t.variant]}</span>
-            <p className="text-white text-sm flex-1">{t.message}</p>
+            <p className="text-white text-sm flex-1 break-words">{t.message}</p>
           </div>
         ))}
       </div>
