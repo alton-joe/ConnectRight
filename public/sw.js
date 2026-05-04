@@ -125,9 +125,16 @@ self.addEventListener('push', (event) => {
         if (focusedOnThisChat) return
       }
 
+      // Layout strategy on Samsung One UI: the small "icon" slot (top right
+      // of the notification card) is driven by the icon prop. The LEFT big
+      // circle is Samsung's messaging-style contact photo placeholder and
+      // can't be set via Web Push at all. Use the brand as the small icon
+      // so there's always a recognisable app mark; the avatar moves to the
+      // image prop so it shows as a large preview where the renderer puts it.
       await self.registration.showNotification(title || 'ConnectRight', {
         body: body || '',
-        icon: icon || '/icons/icon-192x192.png',
+        icon: '/icons/icon-192x192.png',
+        image: icon || '/icons/icon-192x192.png',
         badge: '/icons/icon-72x72.png',
         data: { url: url || '/' },
         vibrate: [200, 100, 200],
