@@ -43,7 +43,7 @@ function HeroTypewriter() {
       <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-nowrap">
         {longest}
       </span>
-      <span className="col-start-1 row-start-1 whitespace-nowrap text-center">
+      <span className="col-start-1 row-start-1 whitespace-nowrap text-left">
         {displayed}
         <span className="inline-block w-[2px] h-[0.9em] bg-orange-500 ml-1 align-middle animate-pulse" />
       </span>
