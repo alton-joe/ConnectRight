@@ -7,6 +7,7 @@ import Button from '@/components/ui/Button'
 import BackButton from '@/components/layout/BackButton'
 import UserAvatar from '@/components/ui/UserAvatar'
 import Modal from '@/components/ui/Modal'
+import NotificationsSection from '@/components/profile/NotificationsSection'
 import { useToast } from '@/components/ui/Toaster'
 import type { Profile } from '@/types'
 import { formatDate } from '@/utils/helpers'
@@ -439,6 +440,8 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
             <p className="text-white text-sm">{formatDate(profile.created_at)}</p>
           </div>
         </div>
+
+        <NotificationsSection userId={profile.id} />
 
         {/* Username change — one-time warning */}
         <Modal

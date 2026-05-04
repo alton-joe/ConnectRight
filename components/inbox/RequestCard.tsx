@@ -11,10 +11,11 @@ import { getInitial } from '@/utils/helpers'
 
 interface RequestCardProps {
   request: ConnectionRequest
+  currentUserId: string
   onRemove: (id: string) => void
 }
 
-export default function RequestCard({ request, onRemove }: RequestCardProps) {
+export default function RequestCard({ request, currentUserId, onRemove }: RequestCardProps) {
   const [loading, setLoading] = useState<'accept' | 'decline' | null>(null)
   const [error, setError] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
@@ -36,6 +37,16 @@ export default function RequestCard({ request, onRemove }: RequestCardProps) {
         setError(rpcError.message || 'Failed to accept. Try again.')
         return
       }
+      // Fire-and-forget push to the original requester. Trigger route looks
+      // up the acceptor's username server-side.
+      void fetch('/api/push/request-accepted', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          acceptorId: currentUserId,
+          requesterId: request.sender_id,
+        }),
+      }).catch(() => { /* fire and forget */ })
       showToast(`You are now connected with @${request.sender?.username ?? 'them'}`, 'success')
       onRemove(request.id)
     } catch (err) {

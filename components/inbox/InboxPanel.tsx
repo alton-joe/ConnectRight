@@ -10,7 +10,7 @@ interface InboxPanelProps {
   currentUserId: string
 }
 
-export default function InboxPanel({ isOpen, onClose, currentUserId: _currentUserId }: InboxPanelProps) {
+export default function InboxPanel({ isOpen, onClose, currentUserId }: InboxPanelProps) {
   const { inboxRequests: hookRequests, refetchInbox: refetch } = useRealtime()
 
   // Optimistic removal overlay: IDs removed locally before the hook re-fetches.
@@ -76,7 +76,7 @@ export default function InboxPanel({ isOpen, onClose, currentUserId: _currentUse
             </div>
           ) : (
             visibleRequests.map((req) => (
-              <RequestCard key={req.id} request={req} onRemove={handleRemove} />
+              <RequestCard key={req.id} request={req} currentUserId={currentUserId} onRemove={handleRemove} />
             ))
           )}
         </div>

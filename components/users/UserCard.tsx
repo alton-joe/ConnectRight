@@ -47,7 +47,19 @@ export default function UserCard({ profile, currentUserId, compact = false }: Us
         .eq('status', 'pending')
         .limit(1)
       if (!existing || existing.length === 0) setOptimisticRequested(false)
+      return
     }
+
+    // Fire-and-forget push notification to the receiver. The trigger route
+    // looks up the sender's username server-side.
+    void fetch('/api/push/new-request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        senderId: currentUserId,
+        receiverId: profile.id,
+      }),
+    }).catch(() => { /* fire and forget */ })
     // On success the hook's INSERT/UPDATE subscription fires, sets status →
     // 'requested', which shadows the optimistic flag automatically.
   }

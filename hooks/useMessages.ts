@@ -492,6 +492,10 @@ export function useMessages(
       // Append the confirmed row to local state (Realtime will also deliver it,
       // but the dedupe in the channel handler makes a double-add a no-op and
       // local append avoids waiting on the round-trip).
+      // Also fires the push-notification trigger exactly once per successful
+      // send (every retry path funnels through here, and the early returns
+      // guarantee at most one call).
+      let pushFired = false
       const appendConfirmed = (created_at: string) => {
         if (!mountedRef.current) return
         const confirmed: Message = {
@@ -504,6 +508,21 @@ export function useMessages(
         setMessages((prev) =>
           prev.some((m) => m.id === msgId) ? prev : [...prev, confirmed]
         )
+        if (!pushFired) {
+          pushFired = true
+          // Fire-and-forget — must not block the send return value.
+          // The trigger route derives receiverId + senderUsername server-side
+          // so the client only sends IDs it already has.
+          void fetch('/api/push/new-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              connectionId,
+              senderId: currentUserId,
+              messagePreview: trimmed.slice(0, 60),
+            }),
+          }).catch(() => { /* fire and forget */ })
+        }
       }
 
       // One insert attempt with a short timeout. The client UUID makes a retry
