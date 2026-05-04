@@ -68,11 +68,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    // Excludes Next.js internals, favicon, common image extensions, and the PWA
-    // assets (manifest.json, sw.js, /icons/*). Without these exclusions the
-    // middleware redirects unauthenticated requests for /manifest.json to / and
-    // the browser fails to parse the returned HTML as JSON ("Manifest: Syntax
-    // error" in DevTools console).
-    '/((?!_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|icons/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Excludes Next.js internals, favicon, common image extensions, the PWA
+    // assets (manifest.json, sw.js, /icons/*), and ALL API routes.
+    //
+    // /api/* must be excluded because middleware redirects unauthenticated
+    // requests to /, and server-to-server fetches between routes carry no
+    // auth cookies — the redirect would turn a JSON API response into the
+    // home-page HTML, breaking every internal API call (notably the push
+    // trigger routes, which call /api/push/send server-side). API routes
+    // handle their own auth (or are intentionally public, e.g. /api/auth/callback).
+    '/((?!api/|_next/static|_next/image|favicon.ico|manifest\\.json|sw\\.js|icons/.*|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
