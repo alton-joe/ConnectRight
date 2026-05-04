@@ -51,8 +51,14 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
         const uid = body?.authUserId ? String(body.authUserId).slice(0, 8) : '?'
         const srAll = body?.serviceRoleSees ?? '?'
         const srUser = body?.serviceRoleForCurrentUser ?? '?'
+        // Send route's own self-report: the userId it actually queried and
+        // how many rows it sees with its own service-role client.
+        const sendRouteSees = body?.sendBody?.sendRouteServiceRoleSees ?? '?'
+        const queriedUid = body?.sendBody?.queriedUserId
+          ? String(body.sendBody.queriedUserId).slice(0, 8)
+          : '?'
         showToast(
-          `0 subs for ${uid}… | service-role sees ${srAll} total, ${srUser} for me`,
+          `auth=${uid} test-sees=${srUser}/${srAll} | send-queried=${queriedUid} send-sees=${sendRouteSees}`,
           'error',
         )
       } else {

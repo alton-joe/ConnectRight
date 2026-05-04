@@ -64,11 +64,34 @@ export async function POST(request: Request) {
 
   if (error) {
     console.error('[push/send] subscription fetch failed:', error.message)
-    return Response.json({ error: 'subscription fetch failed' }, { status: 500 })
+    return Response.json(
+      { error: 'subscription fetch failed', dbError: error.message, queriedUserId: userId },
+      { status: 500 }
+    )
   }
 
   if (!subscriptions || subscriptions.length === 0) {
-    return Response.json({ message: 'no subscriptions' }, { status: 200 })
+    // Diagnostic echo: report exactly what we queried with and how many service-role
+    // sees in total, so we can compare with the test endpoint's diagnostic.
+    let serviceRoleSees: number | string = 'unknown'
+    try {
+      const allCount = await supabase
+        .from('push_subscriptions')
+        .select('*', { count: 'exact', head: true })
+      serviceRoleSees = allCount.count ?? `err:${allCount.error?.message ?? 'null'}`
+    } catch (err) {
+      serviceRoleSees = `threw:${(err as Error).message}`
+    }
+    return Response.json(
+      {
+        message: 'no subscriptions',
+        queriedUserId: userId,
+        queriedUserIdType: typeof userId,
+        queriedUserIdLength: typeof userId === 'string' ? userId.length : -1,
+        sendRouteServiceRoleSees: serviceRoleSees,
+      },
+      { status: 200 }
+    )
   }
 
   const notificationPayload = JSON.stringify({ title, body, url, icon, type, connectionId })
