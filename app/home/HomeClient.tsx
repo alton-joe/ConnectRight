@@ -127,6 +127,13 @@ export default function HomeClient({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connections])
 
+  // Warm the chat route bundle for every connection so a tap on the tile
+  // navigates without paying the JS-load cost. router.prefetch is cheap and
+  // dedupes internally, so calling it on every connections update is fine.
+  useEffect(() => {
+    connections.forEach((c) => router.prefetch(`/chat/${c.id}`))
+  }, [connections, router])
+
   // Clean up pending timer on unmount
   useEffect(() => {
     return () => {

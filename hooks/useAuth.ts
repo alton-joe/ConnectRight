@@ -11,59 +11,74 @@ interface UseAuthReturn {
   loading: boolean
 }
 
+// Module-level cache so multiple useAuth callers (GlobalHeader, ProfileClient,
+// ...) share the latest known user/profile instead of each refetching. This is
+// what makes Home → Profile navigation render the profile body immediately
+// rather than flashing the skeleton while a duplicate fetch completes.
+let cachedUser: User | null = null
+let cachedProfile: Profile | null = null
+let cachedLoading = true
+const listeners = new Set<() => void>()
+
+const setCache = (next: { user?: User | null; profile?: Profile | null; loading?: boolean }) => {
+  if ('user' in next) cachedUser = next.user ?? null
+  if ('profile' in next) cachedProfile = next.profile ?? null
+  if ('loading' in next) cachedLoading = next.loading ?? false
+  listeners.forEach((l) => l())
+}
+
+let initialized = false
+
 export function useAuth(): UseAuthReturn {
-  const [user, setUser] = useState<User | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [, force] = useState(0)
   const mountedRef = useRef(true)
 
   const supabase = useMemo(() => createClient(), [])
 
   useEffect(() => {
     mountedRef.current = true
-    let currentUserId: string | null = null
+    const rerender = () => { if (mountedRef.current) force((n) => n + 1) }
+    listeners.add(rerender)
 
-    const fetchProfile = async (userId: string) => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single()
-      if (mountedRef.current) setProfile(data ?? null)
-    }
+    // Bootstrap once across the whole app — subscribe to auth state changes,
+    // fetch profile on sign-in, and replay cached values to all consumers.
+    if (!initialized) {
+      initialized = true
 
-    // onAuthStateChange fires INITIAL_SESSION immediately, covering the initial
-    // load without a second getUser() HTTP round-trip.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_, session) => {
-        if (!mountedRef.current) return
-        setUser(session?.user ?? null)
-        currentUserId = session?.user?.id ?? null
-        // Resolve loading as soon as we know auth state — don't block on the
-        // profile fetch, so consumers can render auth-gated UI immediately.
-        setLoading(false)
-        if (session?.user) {
-          fetchProfile(session.user.id)
-        } else {
-          setProfile(null)
-        }
+      const fetchProfile = async (userId: string) => {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single()
+        setCache({ profile: data ?? null })
       }
-    )
 
-    // Re-fetch profile when the setup wizard signals it just created/updated
-    // the row. Auth state hasn't changed at that point (same user), so without
-    // this the GlobalHeader keeps the stale profile=null until a hard refresh.
-    const handleProfileUpdated = () => {
-      if (currentUserId) fetchProfile(currentUserId)
+      supabase.auth.onAuthStateChange((_, session) => {
+        const u = session?.user ?? null
+        setCache({ user: u, loading: false })
+        if (u) {
+          // Don't clobber a freshly-set profile from another path; only fetch
+          // if it's empty or belongs to a different user.
+          if (!cachedProfile || cachedProfile.id !== u.id) {
+            fetchProfile(u.id)
+          }
+        } else {
+          setCache({ profile: null })
+        }
+      })
+
+      const handleProfileUpdated = () => {
+        if (cachedUser) fetchProfile(cachedUser.id)
+      }
+      window.addEventListener('connectright:profile-updated', handleProfileUpdated)
     }
-    window.addEventListener('connectright:profile-updated', handleProfileUpdated)
 
     return () => {
       mountedRef.current = false
-      subscription.unsubscribe()
-      window.removeEventListener('connectright:profile-updated', handleProfileUpdated)
+      listeners.delete(rerender)
     }
   }, [supabase])
 
-  return { user, profile, loading }
+  return { user: cachedUser, profile: cachedProfile, loading: cachedLoading }
 }

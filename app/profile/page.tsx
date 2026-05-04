@@ -1,20 +1,8 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import ProfileClient from './ProfileClient'
 
-export default async function ProfilePage() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) redirect('/')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .single()
-
-  if (!profile) redirect('/setup')
-
-  return <ProfileClient profile={profile} />
+// No server-side data fetching: middleware already guards auth and the profile
+// is already cached in the client's useAuth hook (mounted in GlobalHeader).
+// This makes the navigation instant — no per-click getUser() or DB round-trip.
+export default function ProfilePage() {
+  return <ProfileClient />
 }

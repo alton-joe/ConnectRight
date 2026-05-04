@@ -285,6 +285,7 @@ export default function GlobalHeader() {
                 <Link
                   key={label}
                   href={href}
+                  prefetch={href === '/home'}
                   className="px-3 py-1.5 text-base text-white/60 hover:text-white rounded-lg transition-colors"
                 >
                   {label}
@@ -405,6 +406,7 @@ export default function GlobalHeader() {
 
               <Link
                 href="/profile"
+                prefetch
                 className="flex items-center gap-2 pl-1 pr-1 sm:pr-3 py-1 ml-1 min-h-11 text-white/80 hover:text-white transition-colors"
                 aria-label="View profile"
               >

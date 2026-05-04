@@ -40,19 +40,38 @@ export async function middleware(request: NextRequest) {
     return supabaseResponse
   }
 
-  // User is authenticated — check profile
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', user.id)
-    .single()
+  // Skip the profile DB lookup once we've confirmed it exists for this user —
+  // a per-user cookie stamp lets us avoid an extra round-trip on every nav.
+  // The cookie is informational only (page server components still re-check),
+  // so spoofing it just lets a user reach /home with no profile, which renders
+  // empty UI rather than escalating privilege.
+  const profileStampCookie = request.cookies.get('cr_profile_set')?.value
+  let profileExists = profileStampCookie === user.id
 
-  if (!profile) {
-    // New user — must set up username
-    if (pathname !== '/setup') {
-      return NextResponse.redirect(new URL('/setup', request.url))
+  if (!profileExists) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile) {
+      // New user — must set up username
+      if (pathname !== '/setup') {
+        return NextResponse.redirect(new URL('/setup', request.url))
+      }
+      return supabaseResponse
     }
-    return supabaseResponse
+    profileExists = true
+    // Stamp the cookie so subsequent navigations skip this lookup. 30-day TTL
+    // is long enough to cover a typical session; it's cleared on sign-out.
+    supabaseResponse.cookies.set('cr_profile_set', user.id, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      path: '/',
+      maxAge: 60 * 60 * 24 * 30,
+    })
   }
 
   // Profile exists — redirect away from setup/login

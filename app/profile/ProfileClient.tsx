@@ -9,19 +9,41 @@ import UserAvatar from '@/components/ui/UserAvatar'
 import Modal from '@/components/ui/Modal'
 import NotificationsSection from '@/components/profile/NotificationsSection'
 import { useToast } from '@/components/ui/Toaster'
-import type { Profile } from '@/types'
+import { useAuth } from '@/hooks/useAuth'
+import ProfileLoading from './loading'
 import { formatDate } from '@/utils/helpers'
 import { ANIMALS } from '@/lib/avatars'
 import type { AnimalId } from '@/lib/avatars'
 import { INTERESTS, MAX_INTERESTS, getInterest } from '@/lib/interests'
 
-interface ProfileClientProps {
-  profile: Profile
+export default function ProfileClient() {
+  const { profile, loading: authLoading } = useAuth()
+  const router = useRouter()
+
+  // Redirect to /setup if the auth resolved but no profile exists.
+  useEffect(() => {
+    if (!authLoading && !profile) router.replace('/setup')
+  }, [authLoading, profile, router])
+
+  if (!profile) return <ProfileLoading />
+
+  return <ProfileBody profile={profile} />
 }
 
-export default function ProfileClient({ profile }: ProfileClientProps) {
+function ProfileBody({ profile }: { profile: NonNullable<ReturnType<typeof useAuth>['profile']> }) {
   const { showToast } = useToast()
   const [signingOut, setSigningOut] = useState(false)
+
+  // Scroll to the notifications section when the user landed here from the
+  // "Enable notifications" prompt (router.push('/profile#notifications')).
+  // Done in an effect so the section is mounted before we try to scroll.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (window.location.hash !== '#notifications') return
+    const el = document.getElementById('notifications')
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [])
+
   const [region, setRegion] = useState(profile.region ?? '')
   const [editingRegion, setEditingRegion] = useState(false)
   const [savingRegion, setSavingRegion] = useState(false)
@@ -441,7 +463,9 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
           </div>
         </div>
 
-        <NotificationsSection userId={profile.id} />
+        <div id="notifications" className="scroll-mt-24">
+          <NotificationsSection userId={profile.id} />
+        </div>
 
         {/* Username change — one-time warning */}
         <Modal

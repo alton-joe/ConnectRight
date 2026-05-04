@@ -4,6 +4,7 @@ import GlobalHeader from '@/components/layout/GlobalHeader'
 import Providers from '@/components/layout/Providers'
 import PWARegistration from '@/components/layout/PWARegistration'
 import InstallGate from '@/components/pwa/InstallGate'
+import NotificationPrompt from '@/components/layout/NotificationPrompt'
 
 export const metadata: Metadata = {
   title: 'ConnectRight',
@@ -40,6 +41,7 @@ export default function RootLayout({
           <InstallGate>
             <GlobalHeader />
             {children}
+            <NotificationPrompt />
           </InstallGate>
         </Providers>
         <PWARegistration />

@@ -13,62 +13,6 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
   const { showToast } = useToast()
   const [permission, setPermission] = useState<PushPermission>('default')
   const [enabling, setEnabling] = useState(false)
-  const [testing, setTesting] = useState(false)
-
-  const handleTest = async () => {
-    setTesting(true)
-    try {
-      const res = await fetch('/api/push/test', { method: 'POST' })
-      const body = await res.json().catch(() => ({}))
-      console.log('[push test] response:', body)
-
-      if (!res.ok) {
-        const reason = body?.sendBody?.error ?? body?.error ?? `HTTP ${res.status}`
-        showToast(`Test failed: ${reason}`, 'error')
-        return
-      }
-
-      // The test endpoint always returns 200 — surface the underlying
-      // /api/push/send status so a 500 there (e.g. missing VAPID env vars)
-      // isn't masked by an inscrutable "0 subs" message below.
-      if (body?.sendStatus !== 200) {
-        const reason = body?.sendBody?.error ?? `send HTTP ${body?.sendStatus}`
-        showToast(`Send route failed: ${reason}`, 'error')
-        return
-      }
-
-      // Send route returned 200 — but that doesn't mean delivery succeeded.
-      // Inspect per-endpoint outcomes.
-      const delivered: number = body?.delivered ?? 0
-      const total: number = body?.total ?? 0
-      const firstFailure = body?.firstFailure
-
-      if (delivered === total && total > 0) {
-        showToast(`Delivered to ${delivered}/${total} devices — check tray`, 'success')
-      } else if (total === 0) {
-        // Surface the actual keys present in sendBody — definitively shows
-        // whether the deployed send route is running the latest code (which
-        // includes queriedUserId/sendRouteServiceRoleSees) or an older build.
-        const sendKeys = body?.sendBody && typeof body.sendBody === 'object'
-          ? Object.keys(body.sendBody).join(',')
-          : 'no body'
-        showToast(`sendBody keys: [${sendKeys}]`, 'error')
-        // Full payload to console for inspection.
-        console.log('[push test] full response:', JSON.stringify(body, null, 2))
-      } else {
-        const status = firstFailure?.status
-        const provider = firstFailure?.providerBody ?? firstFailure?.message ?? 'no detail'
-        showToast(
-          `Delivered ${delivered}/${total}. First failure: ${status ?? '?'} — ${provider}`,
-          'error',
-        )
-      }
-    } catch (err) {
-      showToast(`Test threw: ${(err as Error).message}`, 'error')
-    } finally {
-      setTesting(false)
-    }
-  }
 
   // Notification.permission has no change event; re-read on mount (after the
   // browser API is available) and again after every action.
@@ -102,20 +46,9 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
             Push notifications aren&apos;t supported on this device.
           </p>
         ) : permission === 'granted' ? (
-          <div className="flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
-              <p className="text-white text-sm">Notifications are enabled</p>
-            </div>
-            <div>
-              <button
-                onClick={handleTest}
-                disabled={testing}
-                className="text-xs text-orange-400 hover:text-orange-300 disabled:opacity-50 cursor-pointer transition-colors"
-              >
-                {testing ? 'Sending…' : 'Send test notification'}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
+            <p className="text-white text-sm">Notifications are enabled</p>
           </div>
         ) : permission === 'denied' ? (
           <div className="flex flex-col gap-1">
