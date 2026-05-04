@@ -13,6 +13,27 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
   const { showToast } = useToast()
   const [permission, setPermission] = useState<PushPermission>('default')
   const [enabling, setEnabling] = useState(false)
+  const [testing, setTesting] = useState(false)
+
+  const handleTest = async () => {
+    setTesting(true)
+    try {
+      const res = await fetch('/api/push/test', { method: 'POST' })
+      const body = await res.json().catch(() => ({}))
+      if (res.ok) {
+        showToast('Test sent — check your notification tray', 'success')
+      } else {
+        // Surface the actual failure reason so the diagnostic isn't silent.
+        const reason = body?.sendBody?.error ?? body?.error ?? `HTTP ${res.status}`
+        showToast(`Test failed: ${reason}`, 'error')
+        console.error('[push test] failed:', body)
+      }
+    } catch (err) {
+      showToast(`Test threw: ${(err as Error).message}`, 'error')
+    } finally {
+      setTesting(false)
+    }
+  }
 
   // Notification.permission has no change event; re-read on mount (after the
   // browser API is available) and again after every action.
@@ -46,9 +67,20 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
             Push notifications aren&apos;t supported on this device.
           </p>
         ) : permission === 'granted' ? (
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
-            <p className="text-white text-sm">Notifications are enabled</p>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-500" aria-hidden="true" />
+              <p className="text-white text-sm">Notifications are enabled</p>
+            </div>
+            <div>
+              <button
+                onClick={handleTest}
+                disabled={testing}
+                className="text-xs text-orange-400 hover:text-orange-300 disabled:opacity-50 cursor-pointer transition-colors"
+              >
+                {testing ? 'Sending…' : 'Send test notification'}
+              </button>
+            </div>
           </div>
         ) : permission === 'denied' ? (
           <div className="flex flex-col gap-1">

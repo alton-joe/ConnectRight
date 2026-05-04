@@ -14,19 +14,20 @@ export default async function HomePage({
 
   const { chat: initialChatId, fs: initialFullscreen } = await searchParams
 
-  // Fetch all profiles except current user
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('*')
-    .neq('id', user.id)
-    .order('created_at', { ascending: false })
-
-  // Fetch pending incoming request count for the badge
-  const { count: pendingCount } = await supabase
-    .from('connection_requests')
-    .select('*', { count: 'exact', head: true })
-    .eq('receiver_id', user.id)
-    .eq('status', 'pending')
+  // Run the two independent reads in parallel — they don't depend on each
+  // other, and serial awaits add up over a slow mobile connection.
+  const [{ data: profiles }, { count: pendingCount }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('*')
+      .neq('id', user.id)
+      .order('created_at', { ascending: false }),
+    supabase
+      .from('connection_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('receiver_id', user.id)
+      .eq('status', 'pending'),
+  ])
 
   return (
     <HomeClient
