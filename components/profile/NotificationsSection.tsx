@@ -46,21 +46,15 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
       if (delivered === total && total > 0) {
         showToast(`Delivered to ${delivered}/${total} devices — check tray`, 'success')
       } else if (total === 0) {
-        // Surface the diagnostic counts. If serviceRoleSees is 0 but the DB
-        // has rows, the deployed SUPABASE_SERVICE_ROLE_KEY env var is wrong.
-        const uid = body?.authUserId ? String(body.authUserId).slice(0, 8) : '?'
-        const srAll = body?.serviceRoleSees ?? '?'
-        const srUser = body?.serviceRoleForCurrentUser ?? '?'
-        // Send route's own self-report: the userId it actually queried and
-        // how many rows it sees with its own service-role client.
-        const sendRouteSees = body?.sendBody?.sendRouteServiceRoleSees ?? '?'
-        const queriedUid = body?.sendBody?.queriedUserId
-          ? String(body.sendBody.queriedUserId).slice(0, 8)
-          : '?'
-        showToast(
-          `auth=${uid} test-sees=${srUser}/${srAll} | send-queried=${queriedUid} send-sees=${sendRouteSees}`,
-          'error',
-        )
+        // Surface the actual keys present in sendBody — definitively shows
+        // whether the deployed send route is running the latest code (which
+        // includes queriedUserId/sendRouteServiceRoleSees) or an older build.
+        const sendKeys = body?.sendBody && typeof body.sendBody === 'object'
+          ? Object.keys(body.sendBody).join(',')
+          : 'no body'
+        showToast(`sendBody keys: [${sendKeys}]`, 'error')
+        // Full payload to console for inspection.
+        console.log('[push test] full response:', JSON.stringify(body, null, 2))
       } else {
         const status = firstFailure?.status
         const provider = firstFailure?.providerBody ?? firstFailure?.message ?? 'no detail'
