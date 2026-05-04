@@ -170,7 +170,21 @@ export default function HomeClient({
           }
         }
       })
-      setLastMessageInfo(map)
+      // Merge instead of replace: a realtime INSERT could have populated a
+      // newer message in `lastMessageInfo` while this fetch was in flight,
+      // and a blanket `set` would overwrite it with the slightly-older row
+      // returned here — that race is what made the connected list reorder
+      // unpredictably across refreshes.
+      setLastMessageInfo((prev) => {
+        const next: Record<string, LastMessageInfo> = { ...prev }
+        for (const [id, info] of Object.entries(map)) {
+          const existing = next[id]
+          if (!existing || info.created_at >= existing.created_at) {
+            next[id] = info
+          }
+        }
+        return next
+      })
     }
   }, [connections, supabase])
 
@@ -274,10 +288,31 @@ export default function HomeClient({
   }, [connections, supabase, fetchLatestMessages])
 
   const sortedConnections = useMemo(() => {
+    // Sort key = most-recent activity for the connection, picking whichever
+    // of (last message, other user's last_active, connection creation) is
+    // newest. Mixing only message-time vs connection-creation produced two
+    // different scales — a connection with no messages but an active partner
+    // would land below a stale connection with an old message — and the
+    // visible result depended on whether `lastMessageInfo` had populated yet,
+    // which is why the 2nd/3rd cards swapped between refreshes.
+    //
+    // ISO-8601 strings sort lexicographically the same as chronologically,
+    // and skip the millisecond rounding that `Date.getTime()` does — that
+    // matters because Postgres timestamps have microsecond precision.
+    const keyFor = (c: typeof connections[number]) => {
+      const msg = lastMessageInfo[c.id]?.created_at
+      const active = c.other_user?.last_active
+      let best = c.created_at
+      if (msg && msg > best) best = msg
+      if (active && active > best) best = active
+      return best
+    }
     return [...connections].sort((a, b) => {
-      const timeA = lastMessageInfo[a.id]?.created_at ?? a.created_at
-      const timeB = lastMessageInfo[b.id]?.created_at ?? b.created_at
-      return new Date(timeB).getTime() - new Date(timeA).getTime()
+      const cmp = keyFor(b).localeCompare(keyFor(a))
+      if (cmp !== 0) return cmp
+      // Identical activity timestamps (e.g. two brand-new connections seeded
+      // together) — fall back to id so ordering is deterministic.
+      return a.id.localeCompare(b.id)
     })
   }, [connections, lastMessageInfo])
 
