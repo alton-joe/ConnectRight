@@ -28,6 +28,15 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
         return
       }
 
+      // The test endpoint always returns 200 — surface the underlying
+      // /api/push/send status so a 500 there (e.g. missing VAPID env vars)
+      // isn't masked by an inscrutable "0 subs" message below.
+      if (body?.sendStatus !== 200) {
+        const reason = body?.sendBody?.error ?? `send HTTP ${body?.sendStatus}`
+        showToast(`Send route failed: ${reason}`, 'error')
+        return
+      }
+
       // Send route returned 200 — but that doesn't mean delivery succeeded.
       // Inspect per-endpoint outcomes.
       const delivered: number = body?.delivered ?? 0
