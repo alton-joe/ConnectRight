@@ -5,13 +5,22 @@ import { createClient } from '@/lib/supabase/server'
 export async function createProfile(
   username: string,
   avatarId?: string,
-  interests?: string[]
+  interests?: string[],
+  region?: string
 ): Promise<{ error?: string }> {
   if (!username || username.length < 3 || username.length > 20) {
     return { error: 'Username must be 3–20 characters.' }
   }
   if (!/^[a-zA-Z0-9_]+$/.test(username)) {
     return { error: 'Username can only contain letters, numbers, and underscores.' }
+  }
+
+  const trimmedRegion = region?.trim() ?? ''
+  if (trimmedRegion.length > 30) {
+    return { error: 'Region must be 30 characters or less.' }
+  }
+  if (trimmedRegion && !/^[A-Za-z, ]+$/.test(trimmedRegion)) {
+    return { error: 'Region can only contain letters, spaces, and commas — no numbers or other symbols.' }
   }
 
   const supabase = await createClient()
@@ -34,6 +43,7 @@ export async function createProfile(
     email: user.email ?? '',
     avatar_url: avatarId ?? user.user_metadata?.avatar_url ?? null,
     interests: interests && interests.length > 0 ? interests : null,
+    region: trimmedRegion || null,
   })
 
   if (insertError) {

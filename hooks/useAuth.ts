@@ -21,6 +21,7 @@ export function useAuth(): UseAuthReturn {
 
   useEffect(() => {
     mountedRef.current = true
+    let currentUserId: string | null = null
 
     const fetchProfile = async (userId: string) => {
       const { data } = await supabase
@@ -37,6 +38,7 @@ export function useAuth(): UseAuthReturn {
       (_, session) => {
         if (!mountedRef.current) return
         setUser(session?.user ?? null)
+        currentUserId = session?.user?.id ?? null
         // Resolve loading as soon as we know auth state — don't block on the
         // profile fetch, so consumers can render auth-gated UI immediately.
         setLoading(false)
@@ -48,9 +50,18 @@ export function useAuth(): UseAuthReturn {
       }
     )
 
+    // Re-fetch profile when the setup wizard signals it just created/updated
+    // the row. Auth state hasn't changed at that point (same user), so without
+    // this the GlobalHeader keeps the stale profile=null until a hard refresh.
+    const handleProfileUpdated = () => {
+      if (currentUserId) fetchProfile(currentUserId)
+    }
+    window.addEventListener('connectright:profile-updated', handleProfileUpdated)
+
     return () => {
       mountedRef.current = false
       subscription.unsubscribe()
+      window.removeEventListener('connectright:profile-updated', handleProfileUpdated)
     }
   }, [supabase])
 

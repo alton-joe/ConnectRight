@@ -52,7 +52,7 @@ function FakeCard({ initial, name, tag, online }: { initial: string; name: strin
 export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avatarUrl }: UsernameSetupProps) {
   const router = useRouter()
   const { showToast } = useToast()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [sliding, setSliding] = useState(false)
 
   const [username, setUsername] = useState('')
@@ -60,9 +60,11 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
   const [loading, setLoading] = useState(false)
   const [availability, setAvailability] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle')
   const [selectedInterests, setSelectedInterests] = useState<string[]>([])
+  const [region, setRegion] = useState('')
+  const [regionError, setRegionError] = useState('')
   const [selectedAvatar, setSelectedAvatar] = useState<AnimalId | null>(null)
 
-  const goToStep = (next: 1 | 2 | 3) => {
+  const goToStep = (next: 1 | 2 | 3 | 4) => {
     setSliding(true)
     setTimeout(() => { setStep(next); setSliding(false) }, 280)
   }
@@ -119,11 +121,28 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
     goToStep(2)
   }
 
-  // Step 2 → Step 3 (avatar) with slide
+  // Step 2 → Step 3 (region) with slide
   const handleInterestsContinue = () => {
     if (selectedInterests.length < 1) return
     showToast(`${selectedInterests.length} interest${selectedInterests.length > 1 ? 's' : ''} selected`, 'success')
     goToStep(3)
+  }
+
+  // Step 3 → Step 4 (avatar) with slide. Region is optional, but if provided
+  // must contain only letters and spaces (no numbers, symbols, or punctuation).
+  const handleRegionContinue = () => {
+    const trimmed = region.trim()
+    if (trimmed.length > 30) {
+      setRegionError('Region must be 30 characters or less.')
+      return
+    }
+    if (trimmed && !/^[A-Za-z, ]+$/.test(trimmed)) {
+      setRegionError('Letters, spaces, and commas only — no numbers or other symbols.')
+      return
+    }
+    setRegionError('')
+    if (trimmed) showToast('Region added', 'success')
+    goToStep(4)
   }
 
   // Final submit
@@ -132,9 +151,13 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
     setLoading(true)
 
     try {
-      const result = await createProfile(username.trim(), selectedAvatar, selectedInterests)
+      const result = await createProfile(username.trim(), selectedAvatar, selectedInterests, region.trim())
       if (result.error) { setUsernameError(result.error); setStep(1); setLoading(false); return }
       localStorage.setItem('connectright_show_welcome', 'true')
+      // Tell useAuth to re-fetch — the profile row only just exists, and no
+      // auth event fires after insert, so the header avatar would otherwise
+      // stay blank until a manual refresh.
+      window.dispatchEvent(new Event('connectright:profile-updated'))
       router.push('/home')
     } catch {
       setUsernameError('Something went wrong. Please try again.')
@@ -273,7 +296,7 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
                   disabled={!canProceed}
                   className="mt-1 w-full bg-white text-black font-semibold text-sm py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  Continue
+                  Next
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                 </button>
               </form>
@@ -332,19 +355,83 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
                 disabled={selectedInterests.length < 1}
                 className="mt-5 w-full bg-white text-black font-semibold text-sm py-2.5 rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Continue
+                Next
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </button>
             </div>
           )}
 
-          {/* ── STEP 3: Avatar picker ── */}
+          {/* ── STEP 3: Region (optional) ── */}
           {step === 3 && (
             <div className="p-6">
               {/* Header */}
               <div className="flex items-center gap-3 mb-5">
                 <button
                   onClick={() => goToStep(2)}
+                  className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                  aria-label="Go back"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>
+                </button>
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-white font-bold text-base leading-none">Where are you based?</h2>
+                  <p className="text-white/35 text-xs mt-1">Helps people nearby find you, <span className="text-orange-400">@{username}</span></p>
+                </div>
+                <span className="text-[10px] uppercase tracking-wide text-white/35 shrink-0 px-1.5 py-0.5 rounded-md border border-white/10">
+                  Optional
+                </span>
+              </div>
+
+              <form
+                onSubmit={(e) => { e.preventDefault(); handleRegionContinue() }}
+                className="flex flex-col gap-2"
+              >
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 10c0 7-8 12-8 12s-8-5-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                  </span>
+                  <input
+                    type="text"
+                    value={region}
+                    onChange={(e) => { setRegion(e.target.value); if (regionError) setRegionError('') }}
+                    placeholder="e.g. Bangalore, India"
+                    maxLength={30}
+                    autoFocus
+                    autoComplete="off"
+                    spellCheck={false}
+                    className={`w-full bg-white/5 border rounded-xl pl-9 pr-12 py-2.5 text-white placeholder:text-white/25 text-sm outline-none transition-colors ${
+                      regionError ? 'border-red-500/60 focus:border-red-500' : 'border-white/10 focus:border-white/30'
+                    }`}
+                  />
+                  <span className={`absolute right-3.5 top-1/2 -translate-y-1/2 text-xs tabular-nums ${region.length > 25 ? 'text-orange-400' : 'text-white/20'}`}>
+                    {region.length}/30
+                  </span>
+                </div>
+                {regionError && (
+                  <p className="mt-2 text-red-400 text-xs flex items-center gap-1.5">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    {regionError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="mt-3 w-full bg-white text-black font-semibold text-sm py-2.5 rounded-xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  Next
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ── STEP 4: Avatar picker ── */}
+          {step === 4 && (
+            <div className="p-6">
+              {/* Header */}
+              <div className="flex items-center gap-3 mb-5">
+                <button
+                  onClick={() => goToStep(3)}
                   className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
                   aria-label="Go back"
                 >
@@ -409,6 +496,8 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
             ? <>Username again can be modified only <span className="text-white font-semibold">once</span> after sign up.</>
             : step === 2
             ? 'Pick the things you genuinely enjoy — others will see these.'
+            : step === 3
+            ? 'Region is optional — you can change it later from your profile.'
             : 'You can update your avatar from your profile anytime.'}
         </p>
       </div>
