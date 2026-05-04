@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { iconForAvatar } from '@/lib/notification-icon'
 
 export const runtime = 'nodejs'
 
@@ -32,11 +33,12 @@ export async function POST(request: Request) {
 
   const { data: sender } = await supabase
     .from('profiles')
-    .select('username')
+    .select('username, avatar_url')
     .eq('id', senderId)
     .maybeSingle()
 
   const senderUsername = sender?.username ?? 'Someone'
+  const icon = iconForAvatar(sender?.avatar_url)
 
   const origin = new URL(request.url).origin
   const sendRes = await fetch(`${origin}/api/push/send`, {
@@ -47,7 +49,7 @@ export async function POST(request: Request) {
       title: 'New Connection Request',
       body: `${senderUsername} wants to connect with you`,
       url: '/home',
-      icon: '/icons/icon-192x192.png',
+      icon,
       type: 'request',
     }),
   }).catch((err) => {
