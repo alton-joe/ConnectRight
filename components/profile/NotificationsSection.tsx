@@ -20,13 +20,31 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
     try {
       const res = await fetch('/api/push/test', { method: 'POST' })
       const body = await res.json().catch(() => ({}))
-      if (res.ok) {
-        showToast('Test sent — check your notification tray', 'success')
-      } else {
-        // Surface the actual failure reason so the diagnostic isn't silent.
+      console.log('[push test] response:', body)
+
+      if (!res.ok) {
         const reason = body?.sendBody?.error ?? body?.error ?? `HTTP ${res.status}`
         showToast(`Test failed: ${reason}`, 'error')
-        console.error('[push test] failed:', body)
+        return
+      }
+
+      // Send route returned 200 — but that doesn't mean delivery succeeded.
+      // Inspect per-endpoint outcomes.
+      const delivered: number = body?.delivered ?? 0
+      const total: number = body?.total ?? 0
+      const firstFailure = body?.firstFailure
+
+      if (delivered === total && total > 0) {
+        showToast(`Delivered to ${delivered}/${total} devices — check tray`, 'success')
+      } else if (total === 0) {
+        showToast('No subscriptions found for your account.', 'error')
+      } else {
+        const status = firstFailure?.status
+        const provider = firstFailure?.providerBody ?? firstFailure?.message ?? 'no detail'
+        showToast(
+          `Delivered ${delivered}/${total}. First failure: ${status ?? '?'} — ${provider}`,
+          'error',
+        )
       }
     } catch (err) {
       showToast(`Test threw: ${(err as Error).message}`, 'error')

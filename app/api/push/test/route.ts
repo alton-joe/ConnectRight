@@ -43,8 +43,21 @@ export async function POST(request: Request) {
   // Surface the send route's actual response so a failure is visible to
   // the caller — unlike the production trigger routes which swallow errors.
   const sendBody = await sendRes.json().catch(() => ({}))
+  const delivered: number = sendBody?.delivered ?? 0
+  const total: number = sendBody?.total ?? 0
+  // Pull the most informative failure reason (FCM/Apple body) so the toast
+  // can show "VAPID key mismatch" or similar instead of a generic HTTP code.
+  const firstFailure = (sendBody?.results ?? []).find(
+    (r: { ok?: boolean }) => r && r.ok === false
+  )
   return Response.json(
-    { sendStatus: sendRes.status, sendBody },
-    { status: sendRes.ok ? 200 : 500 }
+    {
+      sendStatus: sendRes.status,
+      delivered,
+      total,
+      firstFailure,
+      sendBody,
+    },
+    { status: 200 }
   )
 }

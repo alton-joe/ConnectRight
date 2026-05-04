@@ -83,18 +83,28 @@ export async function POST(request: Request) {
         return { endpoint: sub.endpoint, ok: true }
       } catch (err) {
         const status = (err as { statusCode?: number })?.statusCode
+        const message = (err as Error)?.message
+        // web-push attaches the upstream provider's response body here —
+        // FCM/Apple/Mozilla return useful detail (e.g. "VAPID key mismatch").
+        const providerBody = (err as { body?: string })?.body
         // 404/410 = subscription is gone. Prune so we don't keep retrying it
         // on every future notification.
         if (status === 404 || status === 410) {
           await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
         } else {
-          console.warn('[push/send] sendNotification failed:', status, (err as Error)?.message)
+          console.warn('[push/send] sendNotification failed:', status, message, providerBody)
         }
-        return { endpoint: sub.endpoint, ok: false, status }
+        return { endpoint: sub.endpoint, ok: false, status, message, providerBody }
       }
     })
   )
 
-  const summary = results.map((r) => (r.status === 'fulfilled' ? r.value : { ok: false }))
-  return Response.json({ results: summary }, { status: 200 })
+  const summary = results.map((r) =>
+    r.status === 'fulfilled' ? r.value : { ok: false, reason: (r.reason as Error)?.message }
+  )
+  const delivered = summary.filter((s) => 'ok' in s && s.ok).length
+  return Response.json(
+    { delivered, total: summary.length, results: summary },
+    { status: 200 }
+  )
 }
