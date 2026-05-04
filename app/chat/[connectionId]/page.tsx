@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import ChatWindow from '@/components/chat/ChatWindow'
 import ActiveChatSetter from './ActiveChatSetter'
+import ChatUserHeader from './ChatUserHeader'
+import type { Profile } from '@/types'
 
 interface ChatPageProps {
   params: Promise<{ connectionId: string }>
@@ -19,8 +21,8 @@ export default async function ChatPage({ params }: ChatPageProps) {
     .from('connections')
     .select(`
       id, user_a, user_b,
-      profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, last_active, created_at),
-      profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, last_active, created_at)
+      profile_a:profiles!connections_user_a_fkey(id, username, email, avatar_url, region, interests, username_change_count, last_active, created_at),
+      profile_b:profiles!connections_user_b_fkey(id, username, email, avatar_url, region, interests, username_change_count, last_active, created_at)
     `)
     .eq('id', connectionId)
     .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
@@ -30,14 +32,13 @@ export default async function ChatPage({ params }: ChatPageProps) {
 
   type ConnectionWithProfiles = {
     user_a: string
-    profile_a: { username: string }[] | null
-    profile_b: { username: string }[] | null
+    profile_a: Profile[] | Profile | null
+    profile_b: Profile[] | Profile | null
   }
 
   const conn = connection as unknown as ConnectionWithProfiles
-  const otherUserArr =
-    conn.user_a === user.id ? conn.profile_b : conn.profile_a
-  const otherUser = Array.isArray(otherUserArr) ? otherUserArr[0] : otherUserArr
+  const otherUserRaw = conn.user_a === user.id ? conn.profile_b : conn.profile_a
+  const otherUser: Profile | null = Array.isArray(otherUserRaw) ? otherUserRaw[0] ?? null : otherUserRaw
 
   return (
     // Full-screen on mobile (offset by mobile h-16 header), full-screen on desktop too (offset by h-24)
@@ -53,14 +54,7 @@ export default async function ChatPage({ params }: ChatPageProps) {
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </Link>
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0">
-            {otherUser?.username?.charAt(0).toUpperCase() ?? '?'}
-          </div>
-          <p className="text-white font-semibold text-sm truncate">
-            {otherUser?.username ?? 'Chat'}
-          </p>
-        </div>
+        <ChatUserHeader otherUser={otherUser} />
       </div>
 
       {/* Chat window fills remaining height */}

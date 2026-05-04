@@ -309,7 +309,7 @@ export default function GlobalHeader() {
             <button
               onClick={handleSignUp}
               disabled={signingIn}
-              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-sm px-4 py-2.5 min-h-11 rounded-xl hover:bg-gray-50 hover:scale-[1.05] hover:shadow-lg active:scale-[0.98] transition-all duration-200 ease-out disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
+              className="inline-flex items-center gap-2 bg-white text-black font-semibold text-xs px-3 py-1.5 min-h-9 md:text-sm md:px-4 md:py-2.5 md:min-h-11 rounded-xl hover:bg-gray-50 hover:scale-[1.05] hover:shadow-lg active:scale-[0.98] transition-all duration-200 ease-out disabled:opacity-60 disabled:hover:scale-100 disabled:hover:shadow-none cursor-pointer"
             >
               {signingIn ? 'Redirecting...' : 'Sign Up'}
             </button>
@@ -332,9 +332,13 @@ export default function GlobalHeader() {
                   )}
                 </button>
 
-                {/* Notification dropdown */}
+                {/* Notification dropdown.
+                    On mobile we pin it to the viewport edges (fixed) so it can't get
+                    clipped by the header's flex layout — the trigger sits far left of
+                    the right-edge cluster, so right-0 on an absolute panel lands off-screen.
+                    On sm+ we revert to absolute anchored to the trigger. */}
                 {notifOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-[calc(100vw-1rem)] max-w-xs sm:w-80 sm:max-w-none bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-30">
+                  <div className="fixed right-4 top-[4.25rem] w-[min(19rem,calc(100vw-5rem))] sm:absolute sm:right-0 sm:top-full sm:mt-2 sm:w-80 bg-zinc-900 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-30">
                     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
                       <span className="text-white text-sm font-semibold">Messages</span>
                       {chatNotifications.length > 0 && (

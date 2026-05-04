@@ -1,7 +1,55 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
+
+const HERO_WORDS = ['Instantly.', 'Securely.', 'Genuinely.', 'Fast.', 'Truly.']
+
+function HeroTypewriter() {
+  const [wordIndex, setWordIndex] = useState(0)
+  const [displayed, setDisplayed] = useState('')
+  const [phase, setPhase] = useState<'typing' | 'pausing' | 'deleting'>('typing')
+
+  useEffect(() => {
+    const word = HERO_WORDS[wordIndex]
+    if (phase === 'typing') {
+      if (displayed.length < word.length) {
+        const t = setTimeout(() => setDisplayed(word.slice(0, displayed.length + 1)), 110)
+        return () => clearTimeout(t)
+      }
+      const t = setTimeout(() => setPhase('pausing'), 1400)
+      return () => clearTimeout(t)
+    }
+    if (phase === 'pausing') {
+      const t = setTimeout(() => setPhase('deleting'), 200)
+      return () => clearTimeout(t)
+    }
+    if (phase === 'deleting') {
+      if (displayed.length > 0) {
+        const t = setTimeout(() => setDisplayed((d) => d.slice(0, -1)), 55)
+        return () => clearTimeout(t)
+      }
+      setWordIndex((i) => (i + 1) % HERO_WORDS.length)
+      setPhase('typing')
+    }
+  }, [displayed, phase, wordIndex])
+
+  // Reserve the width of the longest word so the heading layout doesn't reflow
+  // each time the cycling word grows or shrinks.
+  const longest = HERO_WORDS.reduce((a, b) => (a.length >= b.length ? a : b))
+
+  return (
+    <span className="inline-grid align-baseline">
+      <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-nowrap">
+        {longest}
+      </span>
+      <span className="col-start-1 row-start-1 whitespace-nowrap text-center">
+        {displayed}
+        <span className="inline-block w-[2px] h-[0.9em] bg-orange-500 ml-1 align-middle animate-pulse" />
+      </span>
+    </span>
+  )
+}
 
 // Static placeholder cards — no real user data exposed
 const PLACEHOLDER_CARDS = [
@@ -29,12 +77,12 @@ export default function LandingPage() {
   }
 
   return (
-    <div className="bg-black flex flex-col">
+    <div className="bg-black flex flex-col h-[100dvh] overflow-hidden md:h-auto md:overflow-visible">
       {/* Hero — pt clears the fixed global header (h-16 mobile / h-24 desktop) */}
-      <section className="pt-24 md:pt-32 pb-8 px-4 md:px-6 text-center flex flex-col items-center gap-4">
+      <section className="pt-24 md:pt-32 pb-8 px-4 md:px-6 text-center flex flex-col items-center gap-4 shrink-0">
         <h1 className="text-4xl md:text-6xl font-bold text-white leading-tight max-w-2xl">
           Find the right people.{' '}
-          <span className="text-white/40">Connect instantly.</span>
+          <span className="text-white/40">Connect <HeroTypewriter /></span>
         </h1>
         <p className="text-white/40 text-base md:text-lg max-w-xl leading-relaxed">
           ConnectRight lets you discover real people, send connection requests,
@@ -43,13 +91,13 @@ export default function LandingPage() {
       </section>
 
       {/* Blurred users section */}
-      <section className="relative max-w-5xl mx-auto w-full px-4 md:px-6 pb-24">
-        <h2 className="text-white/60 text-sm font-medium mb-4 uppercase tracking-widest">
+      <section className="relative max-w-5xl mx-auto w-full px-4 md:px-6 pb-4 md:pb-24 flex-1 min-h-0 flex flex-col">
+        <h2 className="text-white/60 text-sm font-medium mb-3 md:mb-4 uppercase tracking-widest shrink-0">
           Available Users
         </h2>
 
         {/* Blurred grid */}
-        <div className="relative rounded-2xl overflow-hidden">
+        <div className="relative rounded-2xl overflow-hidden flex-1 min-h-0">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 blur-sm pointer-events-none select-none">
             {PLACEHOLDER_CARDS.map((card) => (
               <div
@@ -74,8 +122,8 @@ export default function LandingPage() {
           </div>
 
           {/* Lock overlay */}
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="bg-zinc-950/90 border border-white/10 backdrop-blur-md rounded-2xl px-8 py-8 flex flex-col items-center gap-4 text-center shadow-2xl max-w-xs w-full">
+          <div className="absolute inset-0 flex items-center justify-center p-3">
+            <div className="bg-zinc-950/90 border border-white/10 backdrop-blur-md rounded-2xl px-6 py-5 md:px-8 md:py-8 flex flex-col items-center gap-3 md:gap-4 text-center shadow-2xl max-w-xs w-full">
               <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center border border-white/10">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white/60">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />

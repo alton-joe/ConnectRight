@@ -245,44 +245,57 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
         </div>
 
         {/* Avatar picker */}
-        {pickingAvatar && (
-          <div className="bg-zinc-900 border border-white/10 rounded-xl p-4">
-            <p className="text-white/40 text-xs mb-3">Choose an avatar</p>
-            <div className="grid grid-cols-4 gap-2">
-              {ANIMALS.map((animal) => {
-                const isSelected = avatarUrl === animal.id
-                const isSaving = savingAvatar === animal.id
-                return (
-                  <button
-                    key={animal.id}
-                    onClick={() => handleSelectAvatar(animal.id)}
-                    disabled={savingAvatar !== null}
-                    className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all duration-150 disabled:opacity-60 ${
-                      isSelected
-                        ? 'border-orange-500 bg-orange-500/10'
-                        : 'border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/6'
-                    }`}
-                  >
-                    <div className="w-10 h-10 rounded-full overflow-hidden">
-                      {isSaving ? (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <svg className="animate-spin text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
-                          </svg>
-                        </div>
-                      ) : (
-                        animal.element
-                      )}
-                    </div>
-                    <span className={`text-[10px] font-medium leading-none ${isSelected ? 'text-orange-400' : 'text-white/40'}`}>
-                      {animal.name}
-                    </span>
-                  </button>
-                )
-              })}
-            </div>
+        <Modal
+          isOpen={pickingAvatar}
+          onClose={() => { if (savingAvatar === null) setPickingAvatar(false) }}
+        >
+          <div className="mb-4">
+            <h2 className="text-white font-bold text-base leading-none">Choose an avatar</h2>
+            <p className="text-white/35 text-xs mt-1">Pick the one you like</p>
           </div>
-        )}
+          <div className="grid grid-cols-4 gap-2">
+            {ANIMALS.map((animal) => {
+              const isSelected = avatarUrl === animal.id
+              const isSaving = savingAvatar === animal.id
+              return (
+                <button
+                  key={animal.id}
+                  onClick={() => handleSelectAvatar(animal.id)}
+                  disabled={savingAvatar !== null}
+                  className={`flex flex-col items-center gap-1.5 p-2 rounded-xl border transition-all duration-150 disabled:opacity-60 ${
+                    isSelected
+                      ? 'border-orange-500 bg-orange-500/10'
+                      : 'border-white/8 bg-white/3 hover:border-white/20 hover:bg-white/6'
+                  }`}
+                >
+                  <div className="w-10 h-10 rounded-full overflow-hidden">
+                    {isSaving ? (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <svg className="animate-spin text-white/50" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                        </svg>
+                      </div>
+                    ) : (
+                      animal.element
+                    )}
+                  </div>
+                  <span className={`text-[10px] font-medium leading-none ${isSelected ? 'text-orange-400' : 'text-white/40'}`}>
+                    {animal.name}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-5">
+            <button
+              onClick={() => setPickingAvatar(false)}
+              disabled={savingAvatar !== null}
+              className="w-full py-2.5 rounded-xl border border-white/10 text-white/60 hover:text-white hover:bg-white/5 text-sm transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </Modal>
 
         {/* Info card */}
         <div className="bg-zinc-900 border border-white/10 rounded-xl">

@@ -65,13 +65,13 @@ export default function InstallPage({ onContinueInBrowser }: InstallPageProps) {
   return (
     <>
       <div
-        className="fixed inset-0 z-[100] bg-black text-white flex flex-col items-center px-6"
+        className="fixed inset-0 z-[100] bg-black text-white flex flex-col items-center px-6 overflow-hidden overscroll-none"
         style={{
           paddingTop: 'max(2rem, env(safe-area-inset-top))',
           paddingBottom: 'max(2rem, env(safe-area-inset-bottom))',
         }}
       >
-        <div className="flex-1 w-full flex flex-col items-center justify-center">
+        <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center">
           <div className="flex flex-col items-center text-center max-w-sm w-full gap-6">
             {/* Brand — same style as GlobalHeader */}
             <div className="font-bold text-2xl tracking-tight flex items-center">

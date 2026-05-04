@@ -357,6 +357,16 @@ export default function HomeClient({
 
   const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
 
+  const visibleConnections = useMemo(() => {
+    return sortedConnections
+      .map((conn) => {
+        const info = lastMessageInfo[conn.id]
+        const hasUnread = !!(info && info.sender_id !== currentUserId && !info.read_at)
+        return { conn, hasUnread }
+      })
+      .filter(({ hasUnread }) => connectedFilter === 'all' || hasUnread)
+  }, [sortedConnections, lastMessageInfo, currentUserId, connectedFilter])
+
   return (
     <div className="bg-black flex flex-col pt-16 md:pt-24">
       {/* On mobile: natural document flow, sections stack and content scrolls.
@@ -503,7 +513,11 @@ export default function HomeClient({
                 )}
               </div>
             ) : (
-              <div className="flex flex-col gap-3 md:flex-1 md:overflow-y-auto">
+              <div
+                className={`flex flex-col gap-3 md:flex-1 md:overflow-y-auto md:max-h-none ${
+                  availableProfiles.length > 2 ? 'max-h-80 overflow-y-auto' : ''
+                }`}
+              >
                 {availableProfiles.map((profile) => (
                   <UserCard
                     key={profile.id}
@@ -553,23 +567,15 @@ export default function HomeClient({
                   </button>
                 </div>
 
-                <div className="flex flex-col gap-3 md:flex-1 md:overflow-y-auto">
-                  {(() => {
-                    const visible = sortedConnections
-                      .map((conn) => {
-                        const info = lastMessageInfo[conn.id]
-                        const hasUnread = !!(info && info.sender_id !== currentUserId && !info.read_at)
-                        return { conn, hasUnread }
-                      })
-                      .filter(({ hasUnread }) => connectedFilter === 'all' || hasUnread)
-
-                    if (visible.length === 0 && connectedFilter === 'unread') {
-                      return (
-                        <p className="text-white/30 text-sm mt-6 text-center">No unread chats.</p>
-                      )
-                    }
-
-                    return visible.map(({ conn, hasUnread }) => (
+                <div
+                  className={`flex flex-col gap-3 md:flex-1 md:overflow-y-auto md:max-h-none ${
+                    visibleConnections.length > 2 ? 'max-h-72 overflow-y-auto' : ''
+                  }`}
+                >
+                  {visibleConnections.length === 0 && connectedFilter === 'unread' ? (
+                    <p className="text-white/30 text-sm mt-6 text-center">No unread chats.</p>
+                  ) : (
+                    visibleConnections.map(({ conn, hasUnread }) => (
                       <ConnectedCard
                         key={conn.id}
                         ref={(el: HTMLDivElement | null) => {
@@ -583,7 +589,7 @@ export default function HomeClient({
                         onChat={() => openChat(conn.id)}
                       />
                     ))
-                  })()}
+                  )}
                 </div>
               </>
             )}

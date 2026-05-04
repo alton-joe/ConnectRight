@@ -1,7 +1,7 @@
 export default function SiteFooter() {
   return (
     <footer className="border-t border-white/10 bg-zinc-950">
-      <div className="max-w-5xl mx-auto px-6 py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 md:gap-8">
+      <div className="max-w-5xl mx-auto px-4 md:px-6 pt-8 pb-4 md:py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-8">
 
         {/* Logo + tagline + contact */}
         <div className="flex flex-col gap-4">
@@ -14,7 +14,7 @@ export default function SiteFooter() {
             Real people. Real connections.<br />
             No algorithms, no noise — just you and them.
           </p>
-          <div className="flex flex-col gap-2 mt-2">
+          <div className="hidden md:flex flex-col gap-2 mt-2">
             <a
               href="tel:+918610958241"
               className="flex items-center gap-2 text-white/50 text-sm hover:text-white transition-colors"
@@ -38,14 +38,14 @@ export default function SiteFooter() {
         </div>
 
         {/* Legal links */}
-        <div className="flex flex-col gap-2.5">
-          <a href="/terms" className="text-white/40 text-sm hover:text-white transition-colors">Terms and Conditions</a>
-          <a href="/privacy" className="text-white/40 text-sm hover:text-white transition-colors">Privacy Policy</a>
-          <a href="/cookies" className="text-white/40 text-sm hover:text-white transition-colors">Cookie Policy</a>
+        <div className="w-full flex flex-row flex-nowrap items-center justify-between gap-x-2 md:w-auto md:justify-start md:flex-col md:items-start md:gap-2.5">
+          <a href="/terms" className="text-white/40 text-[13px] whitespace-nowrap hover:text-white transition-colors md:text-sm">Terms and Conditions</a>
+          <a href="/privacy" className="text-white/40 text-[13px] whitespace-nowrap hover:text-white transition-colors md:text-sm">Privacy Policy</a>
+          <a href="/cookies" className="text-white/40 text-[13px] whitespace-nowrap hover:text-white transition-colors md:text-sm">Cookie Policy</a>
         </div>
 
         {/* Social icons */}
-        <div className="flex items-center gap-3">
+        <div className="hidden md:flex items-center gap-3">
           <a
             href="https://www.linkedin.com/in/alton-joe/"
             target="_blank"
