@@ -394,7 +394,7 @@ export default function UsernameSetup({ userId: _userId, email, avatarUrl: _avat
                     type="text"
                     value={region}
                     onChange={(e) => { setRegion(e.target.value); if (regionError) setRegionError('') }}
-                    placeholder="e.g. Bangalore, India"
+                    placeholder="e.g. Bangalore"
                     maxLength={30}
                     autoFocus
                     autoComplete="off"

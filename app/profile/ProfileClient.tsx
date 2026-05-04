@@ -388,7 +388,7 @@ export default function ProfileClient({ profile }: ProfileClientProps) {
                   type="text"
                   value={region}
                   onChange={(e) => setRegion(e.target.value)}
-                  placeholder="e.g. Bangalore, India"
+                  placeholder="e.g. Bangalore"
                   maxLength={80}
                   className="w-full bg-zinc-800 border border-white/10 rounded-lg px-3 py-1.5 text-white text-sm placeholder-white/30 focus:outline-none focus:border-orange-500"
                 />
