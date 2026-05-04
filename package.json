@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "gen-icons": "node scripts/generate-icons.mjs"
+    "gen-icons": "node scripts/generate-icons.mjs",
+    "gen-avatars": "node scripts/generate-avatars.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.2",

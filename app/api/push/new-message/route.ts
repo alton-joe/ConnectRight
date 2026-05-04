@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       .maybeSingle(),
     supabase
       .from('profiles')
-      .select('username')
+      .select('username, avatar_url')
       .eq('id', senderId)
       .maybeSingle(),
   ])
@@ -59,6 +59,20 @@ export async function POST(request: Request) {
   }
 
   const senderUsername = senderRes.data?.username ?? 'Someone'
+  const senderAvatarUrl = senderRes.data?.avatar_url ?? null
+
+  // Resolve the sender's avatar to an icon URL the recipient's OS can fetch.
+  // - "cr:fox" → built-in animal, served as a pre-baked PNG at /avatars/cr-fox.png
+  // - "https://..." → real external URL (e.g. Google profile pic), pass through
+  // - null/other → fall back to the app icon so the notification isn't iconless
+  let icon = '/icons/icon-192x192.png'
+  if (senderAvatarUrl) {
+    if (senderAvatarUrl.startsWith('cr:')) {
+      icon = `/avatars/${senderAvatarUrl.replace(':', '-')}.png`
+    } else if (senderAvatarUrl.startsWith('https://') || senderAvatarUrl.startsWith('http://')) {
+      icon = senderAvatarUrl
+    }
+  }
 
   const origin = new URL(request.url).origin
   const sendRes = await fetch(`${origin}/api/push/send`, {
@@ -69,7 +83,7 @@ export async function POST(request: Request) {
       title: senderUsername,
       body: (messagePreview ?? '').slice(0, 60),
       url: `/chat/${connectionId}`,
-      icon: '/icons/icon-192x192.png',
+      icon,
       // Carried through the SW so it can suppress this push if the
       // recipient is currently focused on this exact chat.
       type: 'message',
