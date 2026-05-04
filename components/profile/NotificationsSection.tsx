@@ -37,7 +37,10 @@ export default function NotificationsSection({ userId }: NotificationsSectionPro
       if (delivered === total && total > 0) {
         showToast(`Delivered to ${delivered}/${total} devices — check tray`, 'success')
       } else if (total === 0) {
-        showToast('No subscriptions found for your account.', 'error')
+        // Show the auth user.id so we can tell whether the session matches
+        // the row we expect in push_subscriptions.
+        const uid = body?.authUserId ? String(body.authUserId).slice(0, 8) : '?'
+        showToast(`No subs for user ${uid}… (open console for full id)`, 'error')
       } else {
         const status = firstFailure?.status
         const provider = firstFailure?.providerBody ?? firstFailure?.message ?? 'no detail'

@@ -53,6 +53,10 @@ export async function POST(request: Request) {
   return Response.json(
     {
       sendStatus: sendRes.status,
+      // Surfaced so we can confirm the route's session matches the user_id
+      // stored in push_subscriptions. A mismatch means the phone PWA is
+      // logged in as a different account than the subscription was made for.
+      authUserId: user.id,
       delivered,
       total,
       firstFailure,
