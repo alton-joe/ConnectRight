@@ -1,7 +1,20 @@
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { cookies } from 'next/headers'
 import { iconForAvatar } from '@/lib/notification-icon'
 
 export const runtime = 'nodejs'
+
+// Module-scoped service-role client cache. See app/api/push/send/route.ts
+// for rationale.
+let serviceClientCache: SupabaseClient | null = null
+function getServiceClient(serviceUrl: string, serviceKey: string): SupabaseClient {
+  if (serviceClientCache) return serviceClientCache
+  serviceClientCache = createClient(serviceUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  return serviceClientCache
+}
 
 type Body = {
   connectionId: string
@@ -10,6 +23,26 @@ type Body = {
 }
 
 export async function POST(request: Request) {
+  // Verify the caller's session matches the claimed senderId. getClaims()
+  // validates the JWT locally (no /auth/v1/user round-trip) — same fast path
+  // middleware uses.
+  const cookieStore = await cookies()
+  const sessionClient = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: () => { /* read-only */ },
+      },
+    }
+  )
+  const { data: claimsData } = await sessionClient.auth.getClaims()
+  const userId = claimsData?.claims?.sub ?? null
+  if (!userId) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
   let body: Body
   try {
     body = await request.json()
@@ -21,6 +54,9 @@ export async function POST(request: Request) {
   if (!connectionId || !senderId) {
     return Response.json({ error: 'Missing required fields' }, { status: 400 })
   }
+  if (senderId !== userId) {
+    return Response.json({ error: 'senderId does not match session' }, { status: 403 })
+  }
 
   const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -31,9 +67,7 @@ export async function POST(request: Request) {
   // Service-role client: derives receiverId from the connection row and
   // looks up the sender's username — both are server-side so the client
   // doesn't have to know either.
-  const supabase = createClient(serviceUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const supabase = getServiceClient(serviceUrl, serviceKey)
 
   const [connRes, senderRes] = await Promise.all([
     supabase
@@ -62,10 +96,18 @@ export async function POST(request: Request) {
   const senderUsername = senderRes.data?.username ?? 'Someone'
   const icon = iconForAvatar(senderRes.data?.avatar_url)
 
+  const internalSecret = process.env.CR_INTERNAL_SECRET
+  if (!internalSecret) {
+    return Response.json({ error: 'CR_INTERNAL_SECRET not configured' }, { status: 500 })
+  }
+
   const origin = new URL(request.url).origin
   const sendRes = await fetch(`${origin}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-cr-internal': internalSecret,
+    },
     body: JSON.stringify({
       userId: receiverId,
       title: senderUsername,

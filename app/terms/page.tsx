@@ -81,7 +81,7 @@ export default function TermsPage() {
             <ul className="flex flex-col gap-2 pl-4 list-disc list-outside marker:text-white/30">
               <li>We collect your Google email address, username, and activity data for the purpose of operating the platform.</li>
               <li>We do not sell your personal data to third parties.</li>
-              <li>Your email address is visible only to you on your profile. Other users can see your username and last active status.</li>
+              <li>Your email address is visible to other signed-in users of ConnectRight as a way to verify the identity of people you connect with. It is not exposed publicly. Other users can also see your username and last active status.</li>
               <li>By using ConnectRight, you consent to the collection and use of your data as described in our Privacy Policy.</li>
               <li>We use Supabase as our backend and database provider. Your data is stored securely in accordance with Supabase's data protection policies.</li>
             </ul>

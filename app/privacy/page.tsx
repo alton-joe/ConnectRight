@@ -106,7 +106,6 @@ export default function PrivacyPage() {
                 <li>All database tables have Row Level Security (RLS) enabled</li>
                 <li>This means each user can only access data they are authorized to see</li>
                 <li>Your private messages are only accessible to you and the user you are connected with</li>
-                <li>Your email address is never visible to other users on the platform</li>
               </ul>
             </section>
 
@@ -191,7 +190,7 @@ export default function PrivacyPage() {
                   <tbody className="divide-y divide-white/5">
                     {[
                       ['Username', 'All users on the platform'],
-                      ['Email Address', 'Only you (on your own profile)'],
+                      ['Email Address', 'Other signed-in users of ConnectRight'],
                       ['Last Active Status', 'Users who view your profile'],
                       ['Messages', 'Only the user you are chatting with'],
                       ['Connection requests sent/received', 'Only you'],
@@ -204,6 +203,9 @@ export default function PrivacyPage() {
                   </tbody>
                 </table>
               </div>
+              <p className="mt-4">
+                Your email address is visible to other signed-in users of ConnectRight as a way to verify the identity of people you connect with. We do not share your email with third parties, sell it, or use it for marketing. Your email is only visible to other users who have signed in to ConnectRight — it is not exposed publicly.
+              </p>
             </section>
 
             <section>

@@ -1,8 +1,20 @@
 import webPush from 'web-push'
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 // web-push uses Node's crypto module — the Edge runtime would crash at import.
 export const runtime = 'nodejs'
+
+// Module-scoped service-role client so we don't rebuild the JWT-less HTTP
+// client on every request. Lazily initialised on first request because env
+// vars must be read at request time on some hosting setups.
+let serviceClientCache: SupabaseClient | null = null
+function getServiceClient(serviceUrl: string, serviceKey: string): SupabaseClient {
+  if (serviceClientCache) return serviceClientCache
+  serviceClientCache = createClient(serviceUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
+  return serviceClientCache
+}
 
 // Module-load time: configure web-push once. If env vars are missing the
 // route returns 500 on first call rather than crashing the build.
@@ -14,6 +26,13 @@ const vapidConfigured = (() => {
   webPush.setVapidDetails(mailto, pub, priv)
   return true
 })()
+
+// No rate limiter at this layer: the CR_INTERNAL_SECRET gate already blocks
+// any external traffic. The only callers are our own trigger routes, which
+// run server-side from the same Vercel deployment — keying by IP would put
+// every push system-wide into one shared bucket and cause silent 429s under
+// any real load. Per-user abuse prevention belongs at the message-insert
+// layer (where authenticated abuse can actually happen), not here.
 
 type SendBody = {
   userId: string
@@ -29,6 +48,19 @@ type SendBody = {
 }
 
 export async function POST(request: Request) {
+  // Internal-only: this route is excluded from middleware (see middleware.ts)
+  // and uses the service-role key, so it MUST gate on a shared secret to
+  // prevent anyone on the internet from triggering pushes to arbitrary users.
+  // The other /api/push/* routes (new-message, new-request, request-accepted,
+  // test) call this route server-side and forward the same header.
+  const internalSecret = process.env.CR_INTERNAL_SECRET
+  if (!internalSecret) {
+    return Response.json({ error: 'CR_INTERNAL_SECRET not configured' }, { status: 500 })
+  }
+  if (request.headers.get('x-cr-internal') !== internalSecret) {
+    return Response.json({ error: 'unauthorized' }, { status: 401 })
+  }
+
   if (!vapidConfigured) {
     return Response.json({ error: 'VAPID env vars not configured' }, { status: 500 })
   }
@@ -53,9 +85,7 @@ export async function POST(request: Request) {
 
   // Service-role client bypasses RLS so we can read every device subscription
   // for the recipient. Never expose this key on the client.
-  const supabase = createClient(serviceUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  })
+  const supabase = getServiceClient(serviceUrl, serviceKey)
 
   const { data: subscriptions, error } = await supabase
     .from('push_subscriptions')

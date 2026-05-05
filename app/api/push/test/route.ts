@@ -10,6 +10,13 @@ export const runtime = 'nodejs'
 // derivation logic.
 
 export async function POST(request: Request) {
+  // Production gate: this endpoint exposes service-role visibility counts
+  // (serviceRoleSees, serviceRoleForCurrentUser) which are diagnostic-only
+  // and should never be reachable on the public site.
+  if (process.env.NODE_ENV === 'production') {
+    return Response.json({ error: 'not found' }, { status: 404 })
+  }
+
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,10 +61,18 @@ export async function POST(request: Request) {
     serviceRoleSees = `threw:${(err as Error).message}`
   }
 
+  const internalSecret = process.env.CR_INTERNAL_SECRET
+  if (!internalSecret) {
+    return Response.json({ error: 'CR_INTERNAL_SECRET not configured' }, { status: 500 })
+  }
+
   const origin = new URL(request.url).origin
   const sendRes = await fetch(`${origin}/api/push/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-cr-internal': internalSecret,
+    },
     body: JSON.stringify({
       userId: user.id,
       title: 'ConnectRight test',
