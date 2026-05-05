@@ -9,6 +9,17 @@ const securityHeaders = [
 ]
 
 const nextConfig: NextConfig = {
+  // Client-side router cache. Without this, Next.js 15+ defaults dynamic
+  // segments to 0s — every Home↔Activity click re-runs the page's server
+  // queries even when the user just left that page. 30s for unprefetched
+  // navigations and 3min for prefetched/static covers normal back-and-forth
+  // browsing without serving stale data on long-idle returns.
+  experimental: {
+    staleTimes: {
+      dynamic: 30,
+      static: 180,
+    },
+  },
   async headers() {
     return [
       {

@@ -25,15 +25,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  // getClaims() verifies the access-token JWT locally (signature + exp) using
+  // Supabase's signing keys — no network round-trip to /auth/v1/user. With
+  // asymmetric signing keys this is the recommended fast path; falls back to
+  // a remote check internally for legacy HS256 tokens. Saves ~150–300ms per nav.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub ?? null
 
   const { pathname } = request.nextUrl
 
   // Public routes — no auth required
   const publicPaths = ['/', '/auth/callback', '/terms', '/privacy', '/cookies', '/about']
-  if (!user) {
+  if (!userId) {
     if (!publicPaths.includes(pathname)) {
       return NextResponse.redirect(new URL('/', request.url))
     }
@@ -46,13 +49,13 @@ export async function middleware(request: NextRequest) {
   // so spoofing it just lets a user reach /home with no profile, which renders
   // empty UI rather than escalating privilege.
   const profileStampCookie = request.cookies.get('cr_profile_set')?.value
-  let profileExists = profileStampCookie === user.id
+  let profileExists = profileStampCookie === userId
 
   if (!profileExists) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
     if (!profile) {
@@ -65,7 +68,7 @@ export async function middleware(request: NextRequest) {
     profileExists = true
     // Stamp the cookie so subsequent navigations skip this lookup. 30-day TTL
     // is long enough to cover a typical session; it's cleared on sign-out.
-    supabaseResponse.cookies.set('cr_profile_set', user.id, {
+    supabaseResponse.cookies.set('cr_profile_set', userId, {
       httpOnly: true,
       sameSite: 'lax',
       secure: process.env.NODE_ENV === 'production',

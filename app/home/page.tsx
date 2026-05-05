@@ -8,9 +8,12 @@ export default async function HomePage({
   searchParams: Promise<{ chat?: string; fs?: string }>
 }) {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  // getClaims() validates the JWT locally — avoids the /auth/v1/user network
+  // round-trip that getUser() performs on every navigation.
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
 
-  if (!user) redirect('/')
+  if (!userId) redirect('/')
 
   const { chat: initialChatId, fs: initialFullscreen } = await searchParams
 
@@ -20,18 +23,18 @@ export default async function HomePage({
     supabase
       .from('profiles')
       .select('*')
-      .neq('id', user.id)
+      .neq('id', userId)
       .order('created_at', { ascending: false }),
     supabase
       .from('connection_requests')
       .select('*', { count: 'exact', head: true })
-      .eq('receiver_id', user.id)
+      .eq('receiver_id', userId)
       .eq('status', 'pending'),
   ])
 
   return (
     <HomeClient
-      currentUserId={user.id}
+      currentUserId={userId}
       initialProfiles={profiles ?? []}
       initialPendingCount={pendingCount ?? 0}
       initialChatId={initialChatId ?? null}
