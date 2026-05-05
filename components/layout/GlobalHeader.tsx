@@ -285,7 +285,7 @@ export default function GlobalHeader() {
                 <Link
                   key={label}
                   href={href}
-                  prefetch={href === '/home'}
+                  prefetch={href === '/home' || href === '/activity'}
                   className="px-3 py-1.5 text-base text-white/60 hover:text-white rounded-lg transition-colors"
                 >
                   {label}
