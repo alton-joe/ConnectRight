@@ -12,6 +12,7 @@ import { useAvailableUsers } from '@/hooks/useAvailableUsers'
 import SiteFooter from '@/components/layout/SiteFooter'
 import { createClient } from '@/lib/supabase/client'
 import UserAvatar from '@/components/ui/UserAvatar'
+import Pagination from '@/components/ui/Pagination'
 import { useActiveChat } from '@/context/ActiveChatContext'
 import { useTypingForConnections } from '@/hooks/useTypingForConnections'
 import type { Profile, Message } from '@/types'
@@ -51,6 +52,9 @@ export default function HomeClient({
   const [connectedSearch, setConnectedSearch] = useState('')
   const [interestFilter, setInterestFilter] = useState<string[]>([])
   const [interestFilterOpen, setInterestFilterOpen] = useState(false)
+  const [availablePage, setAvailablePage] = useState(1)
+  const [connectedPage, setConnectedPage] = useState(1)
+  const PAGE_SIZE = 10
   const interestFilterRef = useRef<HTMLDivElement>(null)
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
@@ -135,6 +139,18 @@ export default function HomeClient({
   useEffect(() => {
     connections.forEach((c) => router.prefetch(`/chat/${c.id}`))
   }, [connections, router])
+
+  // If the selected connection vanishes (we removed it, or the other user did),
+  // tear down the chat panel so the header doesn't render against missing data.
+  useEffect(() => {
+    if (!chatPanelOpen || !selectedConnectionId) return
+    if (!connections.find((c) => c.id === selectedConnectionId)) {
+      closeChat()
+    }
+  // closeChat is stable enough; intentionally omitted to avoid re-runs from
+  // unrelated state in this component.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connections, selectedConnectionId, chatPanelOpen])
 
   // Clean up pending timer on unmount
   useEffect(() => {
@@ -422,6 +438,94 @@ export default function HomeClient({
       })
   }, [sortedConnections, lastMessageInfo, currentUserId, connectedFilter, connectedSearch])
 
+  // Reset to page 1 when the filtered set changes (search/filter input).
+  useEffect(() => {
+    setAvailablePage(1)
+  }, [availableSearch, interestFilter])
+
+  useEffect(() => {
+    setConnectedPage(1)
+  }, [connectedSearch, connectedFilter])
+
+  const availableTotalPages = Math.max(1, Math.ceil(availableProfiles.length / PAGE_SIZE))
+  const connectedTotalPages = Math.max(1, Math.ceil(visibleConnections.length / PAGE_SIZE))
+
+  // Auto-snap if a deletion/disconnect makes the current page disappear.
+  useEffect(() => {
+    if (availablePage > availableTotalPages) setAvailablePage(availableTotalPages)
+  }, [availablePage, availableTotalPages])
+
+  useEffect(() => {
+    if (connectedPage > connectedTotalPages) setConnectedPage(connectedTotalPages)
+  }, [connectedPage, connectedTotalPages])
+
+  const pagedAvailableProfiles = availableProfiles.slice(
+    (availablePage - 1) * PAGE_SIZE,
+    availablePage * PAGE_SIZE
+  )
+
+  const pagedVisibleConnections = visibleConnections.slice(
+    (connectedPage - 1) * PAGE_SIZE,
+    connectedPage * PAGE_SIZE
+  )
+
+  const connectedFilterButtons = connections.length > 0 ? (
+    <>
+      <button
+        onClick={() => setConnectedFilter('all')}
+        className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
+          connectedFilter === 'all'
+            ? 'bg-white text-black'
+            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+        }`}
+      >
+        All
+      </button>
+      <button
+        onClick={() => setConnectedFilter('unread')}
+        className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
+          connectedFilter === 'unread'
+            ? 'bg-white text-black'
+            : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
+        }`}
+      >
+        Unread
+      </button>
+    </>
+  ) : null
+
+  const connectedSearchControls = (
+    <>
+      <svg
+        className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+        width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      >
+        <circle cx="11" cy="11" r="8"/>
+        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+      </svg>
+      <input
+        type="text"
+        value={connectedSearch}
+        onChange={(e) => setConnectedSearch(e.target.value)}
+        placeholder="Search"
+        aria-label="Search connected users"
+        className="bg-white/5 text-white text-xs placeholder:text-white/40 rounded-full pl-7 pr-7 py-1.5 border border-white/10 focus:outline-none focus:border-white/30 w-28 sm:w-36 transition-colors"
+      />
+      {connectedSearch && (
+        <button
+          onClick={() => setConnectedSearch('')}
+          aria-label="Clear search"
+          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5 rounded-full cursor-pointer transition-colors"
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      )}
+    </>
+  )
+
   return (
     <div className="bg-black flex flex-col pt-16 md:pt-24">
       {/* On mobile: natural document flow, sections stack and content scrolls.
@@ -445,9 +549,9 @@ export default function HomeClient({
 
           {/* LEFT — Available Users */}
           <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col gap-4 md:overflow-hidden">
-            <div className="flex items-center justify-between gap-2 shrink-0">
+            <div className={`flex justify-between gap-2 shrink-0 ${chatPanelOpen ? 'items-start' : 'items-center'}`}>
               <h2 className="text-white font-semibold text-base">Available Users</h2>
-              <div className="flex items-center gap-2">
+              <div className={`flex gap-2 ${chatPanelOpen ? 'flex-col items-end' : 'items-center'}`}>
                 <div className="relative">
                   <svg
                     className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
@@ -477,6 +581,7 @@ export default function HomeClient({
                     </button>
                   )}
                 </div>
+                <div className="flex items-center gap-2">
                 <div className="relative" ref={interestFilterRef}>
                   <button
                     onClick={() => setInterestFilterOpen((v) => !v)}
@@ -546,6 +651,7 @@ export default function HomeClient({
                     </span>
                   </button>
                 )}
+                </div>
               </div>
             </div>
 
@@ -612,7 +718,7 @@ export default function HomeClient({
                   availableProfiles.length > 2 ? 'max-h-80 overflow-y-auto' : ''
                 }`}
               >
-                {availableProfiles.map((profile) => (
+                {pagedAvailableProfiles.map((profile) => (
                   <UserCard
                     key={profile.id}
                     profile={profile}
@@ -620,68 +726,42 @@ export default function HomeClient({
                     compact={chatPanelOpen}
                   />
                 ))}
+                <Pagination
+                  currentPage={availablePage}
+                  totalPages={availableTotalPages}
+                  onPageChange={setAvailablePage}
+                />
               </div>
             )}
           </section>
 
           {/* MIDDLE (or RIGHT when no chat) — Connected list */}
           <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col gap-4 md:overflow-hidden">
-            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 shrink-0">
-              <h2 className="text-white font-semibold text-base">Connected</h2>
-              {connections.length > 0 && (
-                <div className="flex items-center gap-2 md:contents">
-                  <button
-                    onClick={() => setConnectedFilter('all')}
-                    className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
-                      connectedFilter === 'all'
-                        ? 'bg-white text-black'
-                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    All
-                  </button>
-                  <button
-                    onClick={() => setConnectedFilter('unread')}
-                    className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
-                      connectedFilter === 'unread'
-                        ? 'bg-white text-black'
-                        : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white'
-                    }`}
-                  >
-                    Unread
-                  </button>
-                  <div className="relative ml-auto md:order-last">
-                    <svg
-                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
-                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                    >
-                      <circle cx="11" cy="11" r="8"/>
-                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input
-                      type="text"
-                      value={connectedSearch}
-                      onChange={(e) => setConnectedSearch(e.target.value)}
-                      placeholder="Search"
-                      aria-label="Search connected users"
-                      className="bg-white/5 text-white text-xs placeholder:text-white/40 rounded-full pl-7 pr-7 py-1.5 border border-white/10 focus:outline-none focus:border-white/30 w-28 sm:w-36 transition-colors"
-                    />
-                    {connectedSearch && (
-                      <button
-                        onClick={() => setConnectedSearch('')}
-                        aria-label="Clear search"
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5 rounded-full cursor-pointer transition-colors"
-                      >
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <line x1="18" y1="6" x2="6" y2="18"/>
-                          <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+            {chatPanelOpen ? (
+              <div className="flex flex-col gap-2 shrink-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-white font-semibold text-base">Connected</h2>
+                  {connectedFilterButtons}
                 </div>
-              )}
-            </div>
+                {connections.length > 0 && (
+                  <div className="relative self-start">
+                    {connectedSearchControls}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 shrink-0">
+                <h2 className="text-white font-semibold text-base">Connected</h2>
+                {connections.length > 0 && (
+                  <div className="flex items-center gap-2 md:contents">
+                    {connectedFilterButtons}
+                    <div className="relative ml-auto md:order-last">
+                      {connectedSearchControls}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
             {connections.length === 0 ? (
               <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
@@ -702,20 +782,27 @@ export default function HomeClient({
                   ) : visibleConnections.length === 0 && connectedFilter === 'unread' ? (
                     <p className="text-white/30 text-sm mt-6 text-center">No unread chats.</p>
                   ) : (
-                    visibleConnections.map(({ conn, hasUnread }) => (
-                      <ConnectedCard
-                        key={conn.id}
-                        ref={(el: HTMLDivElement | null) => {
-                          if (el) cardRefs.current.set(conn.id, el)
-                          else cardRefs.current.delete(conn.id)
-                        }}
-                        connection={conn}
-                        isSelected={conn.id === selectedConnectionId && chatPanelOpen}
-                        isTyping={!!typingMap[conn.id]}
-                        hasUnread={hasUnread}
-                        onChat={() => openChat(conn.id)}
+                    <>
+                      {pagedVisibleConnections.map(({ conn, hasUnread }) => (
+                        <ConnectedCard
+                          key={conn.id}
+                          ref={(el: HTMLDivElement | null) => {
+                            if (el) cardRefs.current.set(conn.id, el)
+                            else cardRefs.current.delete(conn.id)
+                          }}
+                          connection={conn}
+                          isSelected={conn.id === selectedConnectionId && chatPanelOpen}
+                          isTyping={!!typingMap[conn.id]}
+                          hasUnread={hasUnread}
+                          onChat={() => openChat(conn.id)}
+                        />
+                      ))}
+                      <Pagination
+                        currentPage={connectedPage}
+                        totalPages={connectedTotalPages}
+                        onPageChange={setConnectedPage}
                       />
-                    ))
+                    </>
                   )}
                 </div>
               </>
@@ -834,6 +921,11 @@ export default function HomeClient({
           profile={selectedConnection.other_user}
           isOpen={profileModalOpen}
           onClose={() => setProfileModalOpen(false)}
+          connectionId={selectedConnection.id}
+          onRemoved={() => {
+            setProfileModalOpen(false)
+            closeChat()
+          }}
         />
       )}
     </div>

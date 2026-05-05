@@ -1,12 +1,19 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import UserAvatar from '@/components/ui/UserAvatar'
 import ViewProfileModal from '@/components/users/ViewProfileModal'
 import type { Profile } from '@/types'
 
-export default function ChatUserHeader({ otherUser }: { otherUser: Profile | null }) {
+interface ChatUserHeaderProps {
+  otherUser: Profile | null
+  connectionId: string
+}
+
+export default function ChatUserHeader({ otherUser, connectionId }: ChatUserHeaderProps) {
   const [profileOpen, setProfileOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <>
@@ -31,6 +38,11 @@ export default function ChatUserHeader({ otherUser }: { otherUser: Profile | nul
           profile={otherUser}
           isOpen={profileOpen}
           onClose={() => setProfileOpen(false)}
+          connectionId={connectionId}
+          onRemoved={() => {
+            setProfileOpen(false)
+            router.push('/home')
+          }}
         />
       )}
     </>

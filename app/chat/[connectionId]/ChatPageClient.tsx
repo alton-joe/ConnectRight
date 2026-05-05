@@ -61,7 +61,7 @@ export default function ChatPageClient({ connectionId }: { connectionId: string 
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </a>
-        <ChatUserHeader otherUser={otherUser} />
+        <ChatUserHeader otherUser={otherUser} connectionId={connectionId} />
       </div>
 
       <div className="flex-1 overflow-hidden min-h-0">
