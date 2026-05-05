@@ -47,6 +47,8 @@ export default function HomeClient({
   const [fullscreenChat, setFullscreenChat] = useState(initialFullscreen && !!initialChatId)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
   const [connectedFilter, setConnectedFilter] = useState<'all' | 'unread'>('all')
+  const [availableSearch, setAvailableSearch] = useState('')
+  const [connectedSearch, setConnectedSearch] = useState('')
   const [interestFilter, setInterestFilter] = useState<string[]>([])
   const [interestFilterOpen, setInterestFilterOpen] = useState(false)
   const interestFilterRef = useRef<HTMLDivElement>(null)
@@ -370,12 +372,18 @@ export default function HomeClient({
 
   const availableProfiles = useMemo(
     () => {
-      const base = allOtherProfiles.filter((p) => !connectedIds.has(p.id))
-      if (interestFilter.length === 0) return base
-      // OR semantics — any matching interest qualifies the profile.
-      return base.filter((p) => p.interests?.some((id) => interestFilter.includes(id)))
+      let base = allOtherProfiles.filter((p) => !connectedIds.has(p.id))
+      if (interestFilter.length > 0) {
+        // OR semantics — any matching interest qualifies the profile.
+        base = base.filter((p) => p.interests?.some((id) => interestFilter.includes(id)))
+      }
+      const q = availableSearch.trim().toLowerCase()
+      if (q) {
+        base = base.filter((p) => p.username?.toLowerCase().includes(q))
+      }
+      return base
     },
-    [allOtherProfiles, connectedIds, interestFilter]
+    [allOtherProfiles, connectedIds, interestFilter, availableSearch]
   )
 
   useEffect(() => {
@@ -400,6 +408,7 @@ export default function HomeClient({
   const selectedConnection = connections.find((c) => c.id === selectedConnectionId)
 
   const visibleConnections = useMemo(() => {
+    const q = connectedSearch.trim().toLowerCase()
     return sortedConnections
       .map((conn) => {
         const info = lastMessageInfo[conn.id]
@@ -407,7 +416,11 @@ export default function HomeClient({
         return { conn, hasUnread }
       })
       .filter(({ hasUnread }) => connectedFilter === 'all' || hasUnread)
-  }, [sortedConnections, lastMessageInfo, currentUserId, connectedFilter])
+      .filter(({ conn }) => {
+        if (!q) return true
+        return conn.other_user?.username?.toLowerCase().includes(q) ?? false
+      })
+  }, [sortedConnections, lastMessageInfo, currentUserId, connectedFilter, connectedSearch])
 
   return (
     <div className="bg-black flex flex-col pt-16 md:pt-24">
@@ -435,6 +448,35 @@ export default function HomeClient({
             <div className="flex items-center justify-between gap-2 shrink-0">
               <h2 className="text-white font-semibold text-base">Available Users</h2>
               <div className="flex items-center gap-2">
+                <div className="relative">
+                  <svg
+                    className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+                    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  >
+                    <circle cx="11" cy="11" r="8"/>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input
+                    type="text"
+                    value={availableSearch}
+                    onChange={(e) => setAvailableSearch(e.target.value)}
+                    placeholder="Search"
+                    aria-label="Search available users"
+                    className="bg-white/5 text-white text-xs placeholder:text-white/40 rounded-full pl-7 pr-7 py-1.5 border border-white/10 focus:outline-none focus:border-white/30 w-28 sm:w-36 transition-colors"
+                  />
+                  {availableSearch && (
+                    <button
+                      onClick={() => setAvailableSearch('')}
+                      aria-label="Clear search"
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5 rounded-full cursor-pointer transition-colors"
+                    >
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                      </svg>
+                    </button>
+                  )}
+                </div>
                 <div className="relative" ref={interestFilterRef}>
                   <button
                     onClick={() => setInterestFilterOpen((v) => !v)}
@@ -537,7 +579,17 @@ export default function HomeClient({
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                {interestFilter.length > 0 ? (
+                {availableSearch.trim() ? (
+                  <>
+                    <p className="text-white/30 text-sm">No users match &quot;{availableSearch}&quot;.</p>
+                    <button
+                      onClick={() => setAvailableSearch('')}
+                      className="text-white/80 hover:text-white text-xs cursor-pointer transition-colors underline"
+                    >
+                      Clear search
+                    </button>
+                  </>
+                ) : interestFilter.length > 0 ? (
                   <>
                     <p className="text-white/30 text-sm">No users match these interests.</p>
                     <button
@@ -585,8 +637,8 @@ export default function HomeClient({
               </div>
             ) : (
               <>
-                {/* Filter toggle */}
-                <div className="flex gap-2 shrink-0">
+                {/* Filter toggle + search */}
+                <div className="flex items-center gap-2 shrink-0">
                   <button
                     onClick={() => setConnectedFilter('all')}
                     className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
@@ -607,6 +659,35 @@ export default function HomeClient({
                   >
                     Unread
                   </button>
+                  <div className="relative ml-auto">
+                    <svg
+                      className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
+                      width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                    >
+                      <circle cx="11" cy="11" r="8"/>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <input
+                      type="text"
+                      value={connectedSearch}
+                      onChange={(e) => setConnectedSearch(e.target.value)}
+                      placeholder="Search"
+                      aria-label="Search connected users"
+                      className="bg-white/5 text-white text-xs placeholder:text-white/40 rounded-full pl-7 pr-7 py-1.5 border border-white/10 focus:outline-none focus:border-white/30 w-28 sm:w-36 transition-colors"
+                    />
+                    {connectedSearch && (
+                      <button
+                        onClick={() => setConnectedSearch('')}
+                        aria-label="Clear search"
+                        className="absolute right-1.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white p-0.5 rounded-full cursor-pointer transition-colors"
+                      >
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="18" y1="6" x2="6" y2="18"/>
+                          <line x1="6" y1="6" x2="18" y2="18"/>
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 <div
@@ -614,7 +695,9 @@ export default function HomeClient({
                     visibleConnections.length > 2 ? 'max-h-72 overflow-y-auto' : ''
                   }`}
                 >
-                  {visibleConnections.length === 0 && connectedFilter === 'unread' ? (
+                  {visibleConnections.length === 0 && connectedSearch.trim() ? (
+                    <p className="text-white/30 text-sm mt-6 text-center">No connections match &quot;{connectedSearch}&quot;.</p>
+                  ) : visibleConnections.length === 0 && connectedFilter === 'unread' ? (
                     <p className="text-white/30 text-sm mt-6 text-center">No unread chats.</p>
                   ) : (
                     visibleConnections.map(({ conn, hasUnread }) => (
