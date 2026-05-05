@@ -20,23 +20,6 @@ export function useToast(): ToastContextValue {
   return useContext(ToastContext)
 }
 
-const STORAGE_KEY = 'connectright_pending_toasts'
-
-// Use to surface a toast that should appear after a navigation (e.g. a
-// server-action that immediately redirects). The next ToasterProvider mount
-// drains the queue.
-export function queueToast(message: string, variant: ToastVariant = 'success') {
-  if (typeof window === 'undefined') return
-  try {
-    const raw = window.sessionStorage.getItem(STORAGE_KEY)
-    const list = raw ? (JSON.parse(raw) as { message: string; variant: ToastVariant }[]) : []
-    list.push({ message, variant })
-    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(list))
-  } catch {
-    // sessionStorage unavailable — silently drop
-  }
-}
-
 const ICONS: Record<ToastVariant, React.ReactNode> = {
   success: (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -76,22 +59,10 @@ export function ToasterProvider({ children }: { children: React.ReactNode }) {
     }, 3500)
   }, [])
 
-  // Drain any toasts that were queued before a navigation.
+  // Server-side OAuth callback drops a `cr_just_verified=<kind>` cookie that
+  // we surface here, then immediately delete so the toast doesn't repeat.
+  // <kind> is 'signup' for fresh users and 'login' for returning ones.
   useEffect(() => {
-    try {
-      const raw = window.sessionStorage.getItem(STORAGE_KEY)
-      if (raw) {
-        window.sessionStorage.removeItem(STORAGE_KEY)
-        const list = JSON.parse(raw) as { message: string; variant: ToastVariant }[]
-        list.forEach((t) => showToast(t.message, t.variant))
-      }
-    } catch {
-      // ignore parse / storage errors
-    }
-
-    // Server-side OAuth callback drops a `cr_just_verified=<kind>` cookie that
-    // we surface here, then immediately delete so the toast doesn't repeat.
-    // <kind> is 'signup' for fresh users and 'login' for returning ones.
     const flag = document.cookie
       .split('; ')
       .find((c) => c.startsWith('cr_just_verified='))
