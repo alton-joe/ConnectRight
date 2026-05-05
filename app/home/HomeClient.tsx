@@ -626,19 +626,10 @@ export default function HomeClient({
 
           {/* MIDDLE (or RIGHT when no chat) — Connected list */}
           <section className="bg-zinc-900 border border-white/10 rounded-2xl p-4 md:p-5 flex flex-col gap-4 md:overflow-hidden">
-            <h2 className="text-white font-semibold text-base shrink-0">Connected</h2>
-            {connections.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
-                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                </svg>
-                <p className="text-white/30 text-sm">No users connected with yet.</p>
-                <p className="text-white/20 text-xs">Send a connection request to get started.</p>
-              </div>
-            ) : (
-              <>
-                {/* Filter toggle + search */}
-                <div className="flex items-center gap-2 shrink-0">
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-2 shrink-0">
+              <h2 className="text-white font-semibold text-base">Connected</h2>
+              {connections.length > 0 && (
+                <div className="flex items-center gap-2 md:contents">
                   <button
                     onClick={() => setConnectedFilter('all')}
                     className={`text-xs font-medium rounded-full px-3 py-1 transition-colors ${
@@ -659,7 +650,7 @@ export default function HomeClient({
                   >
                     Unread
                   </button>
-                  <div className="relative ml-auto">
+                  <div className="relative ml-auto md:order-last">
                     <svg
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none"
                       width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -689,7 +680,18 @@ export default function HomeClient({
                     )}
                   </div>
                 </div>
-
+              )}
+            </div>
+            {connections.length === 0 ? (
+              <div className="flex-1 flex flex-col items-center justify-center gap-2 text-center">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/20">
+                  <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                </svg>
+                <p className="text-white/30 text-sm">No users connected with yet.</p>
+                <p className="text-white/20 text-xs">Send a connection request to get started.</p>
+              </div>
+            ) : (
+              <>
                 <div
                   className={`flex flex-col gap-3 md:flex-1 md:overflow-y-auto md:max-h-none ${
                     visibleConnections.length > 2 ? 'max-h-72 overflow-y-auto' : ''
