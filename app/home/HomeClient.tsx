@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import UserCard from '@/components/users/UserCard'
 import ViewProfileModal from '@/components/users/ViewProfileModal'
@@ -55,7 +56,9 @@ export default function HomeClient({
   const [availablePage, setAvailablePage] = useState(1)
   const [connectedPage, setConnectedPage] = useState(1)
   const PAGE_SIZE = 10
-  const interestFilterRef = useRef<HTMLDivElement>(null)
+  const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const filterDropdownRef = useRef<HTMLDivElement>(null)
+  const [filterDropdownPos, setFilterDropdownPos] = useState<{ top: number; right: number } | null>(null)
   // selectedConnectionId persists through the close animation so ChatWindow stays mounted
   const [selectedConnectionId, setSelectedConnectionId] = useState<string | null>(null)
   const [lastMessageInfo, setLastMessageInfo] = useState<Record<string, LastMessageInfo>>({})
@@ -405,12 +408,36 @@ export default function HomeClient({
   useEffect(() => {
     if (!interestFilterOpen) return
     const onDocClick = (e: MouseEvent) => {
-      if (interestFilterRef.current && !interestFilterRef.current.contains(e.target as Node)) {
-        setInterestFilterOpen(false)
-      }
+      const target = e.target as Node
+      if (filterButtonRef.current?.contains(target)) return
+      if (filterDropdownRef.current?.contains(target)) return
+      setInterestFilterOpen(false)
     }
     document.addEventListener('mousedown', onDocClick)
     return () => document.removeEventListener('mousedown', onDocClick)
+  }, [interestFilterOpen])
+
+  // Position the portaled filter dropdown using the button's viewport rect.
+  // Portaling escapes the Available Users section's overflow-hidden, which
+  // was clipping the dropdown when the chat panel narrowed the column.
+  useEffect(() => {
+    if (!interestFilterOpen) return
+    const update = () => {
+      const btn = filterButtonRef.current
+      if (!btn) return
+      const rect = btn.getBoundingClientRect()
+      setFilterDropdownPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    update()
+    window.addEventListener('resize', update)
+    window.addEventListener('scroll', update, true)
+    return () => {
+      window.removeEventListener('resize', update)
+      window.removeEventListener('scroll', update, true)
+    }
   }, [interestFilterOpen])
 
   const toggleInterestFilter = (id: string) => {
@@ -582,8 +609,9 @@ export default function HomeClient({
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                <div className="relative" ref={interestFilterRef}>
+                <div className="relative">
                   <button
+                    ref={filterButtonRef}
                     onClick={() => setInterestFilterOpen((v) => !v)}
                     className={`flex items-center gap-1.5 text-xs rounded-full px-3 py-1.5 cursor-pointer transition-colors ${
                       interestFilter.length > 0
@@ -602,8 +630,12 @@ export default function HomeClient({
                       </span>
                     )}
                   </button>
-                  {interestFilterOpen && (
-                    <div className="absolute right-0 top-full mt-2 z-30 w-[min(18rem,calc(100vw-2rem))] bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-3">
+                  {interestFilterOpen && filterDropdownPos && typeof document !== 'undefined' && createPortal(
+                    <div
+                      ref={filterDropdownRef}
+                      className="fixed z-[60] w-[min(18rem,calc(100vw-1rem))] bg-zinc-950 border border-white/10 rounded-xl shadow-2xl p-3"
+                      style={{ top: filterDropdownPos.top, right: filterDropdownPos.right }}
+                    >
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-white/60 text-xs">Filter by interest <span className="text-white/30">(max 5)</span></p>
                         <span className={`text-[11px] tabular-nums ${interestFilter.length >= MAX_INTERESTS ? 'text-white' : 'text-white/40'}`}>
@@ -633,7 +665,8 @@ export default function HomeClient({
                           )
                         })}
                       </div>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
                 {interestFilter.length > 0 && (
