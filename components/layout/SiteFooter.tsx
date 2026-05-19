@@ -2,8 +2,10 @@ export default function SiteFooter() {
   return (
     <>
       <div className="bg-black py-5 text-center">
-        <p className="text-orange-500 text-sm font-medium tracking-wide">
-          Built and maintained by Alton Joe
+        <p className="text-sm font-medium tracking-wide">
+          <span className="text-orange-500">Built</span>
+          <span className="text-white"> and maintained by </span>
+          <span className="text-orange-500">Alton Joe</span>
         </p>
       </div>
       <footer className="border-t border-white/10 bg-zinc-950">
