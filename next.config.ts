@@ -66,6 +66,10 @@ const nextConfig: NextConfig = {
       dynamic: 30,
       static: 180,
     },
+    // Don't eagerly load every route's JS modules into the server process on
+    // startup. Routes still compile on first visit; this just avoids the big
+    // upfront memory hit on `next dev` boot.
+    preloadEntriesOnStart: false,
   },
   async headers() {
     return [

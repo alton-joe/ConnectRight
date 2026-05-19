@@ -1,6 +1,12 @@
 export default function SiteFooter() {
   return (
-    <footer className="border-t border-white/10 bg-zinc-950">
+    <>
+      <div className="bg-black py-5 text-center">
+        <p className="text-orange-500 text-sm font-medium tracking-wide">
+          Built and maintained by Alton Joe
+        </p>
+      </div>
+      <footer className="border-t border-white/10 bg-zinc-950">
       <div className="max-w-5xl mx-auto px-4 md:px-6 pt-8 pb-4 md:py-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-8">
 
         {/* Logo + tagline + contact */}
@@ -87,6 +93,7 @@ export default function SiteFooter() {
       <div className="border-t border-white/5 py-4 px-6 text-center">
         <p className="text-white/20 text-xs">© {new Date().getFullYear()} ConnectRight. All rights reserved.</p>
       </div>
-    </footer>
+      </footer>
+    </>
   )
 }
